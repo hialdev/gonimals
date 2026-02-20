@@ -24,12 +24,14 @@ import { LoadingScreen } from 'src/components/loading-screen';
 import { ProductCard } from '../../dashboard/catalog/components/product-card';
 import { CartModal } from '../../dashboard/catalog/components/cart-modal';
 import { AddToCartModal } from '../../dashboard/catalog/components/add-to-cart-modal';
+import { ReviewListModal } from '../../dashboard/catalog/components/review-list-modal';
 
 // ----------------------------------------------------------------------
 
 export function HomeView() {
    const cartModal = useBoolean();
    const addToCartModal = useBoolean();
+   const reviewModal = useBoolean();
 
    const { products, getCatalog: getProducts } = useProductStore();
    const { getItemCount } = useCartStore();
@@ -67,6 +69,11 @@ export function HomeView() {
       addToCartModal.onFalse();
    };
 
+   const handleViewReviews = (product: Product) => {
+      setSelectedProduct(product);
+      reviewModal.onTrue();
+   };
+
    const cartItemCount = getItemCount();
    const [mounted, setMounted] = useState(false);
 
@@ -85,8 +92,8 @@ export function HomeView() {
                textAlign: 'center',
             }}
          >
-            <Typography variant="h2" sx={{ mb: 2 }}>
-               Selamat Datang di Gonimals
+            <Typography variant="h2" sx={{ mb: 2, maxWidth: 600, mx: 'auto' }}>
+               Belanja Hewan Qurban & Ternak diujung jari!
             </Typography>
             <Typography variant="body1" sx={{ color: 'text.secondary', maxWidth: 600, mx: 'auto' }}>
                Jelajahi koleksi hewan dan produk terbaik kami. Nikmati kemudahan berbelanja dengan
@@ -112,6 +119,7 @@ export function HomeView() {
                               <ProductCard
                                  product={product}
                                  onAddToCart={() => handleOpenAddToCart(product)}
+                                 onViewReviews={() => handleViewReviews(product)}
                               />
                            </Grid>
                         ))}
@@ -149,6 +157,14 @@ export function HomeView() {
 
          {/* Cart Modal */}
          <CartModal open={cartModal.value} onClose={cartModal.onFalse} />
+
+         {/* Review Modal */}
+         <ReviewListModal
+            open={reviewModal.value}
+            onClose={reviewModal.onFalse}
+            productId={selectedProduct?.id || null}
+            productTitle={selectedProduct?.title}
+         />
       </>
    );
 }

@@ -13,14 +13,12 @@ import Button from '@mui/material/Button';
 
 import { paths } from 'src/routes/paths';
 import { usePathname } from 'src/routes/hooks';
+import { RouterLink } from 'src/routes/components';
+import useAuthStore from 'src/stores/auth';
 
 import { Logo } from 'src/components/logo';
 
-import { NavMobile } from './nav/mobile';
-import { NavDesktop } from './nav/desktop';
 import { Footer, HomeFooter } from './footer';
-import { MenuButton } from '../components/menu-button';
-import { navData as mainNavData } from '../nav-config-main';
 import { SignInButton } from '../components/sign-in-button';
 import { SettingsButton } from '../components/settings-button';
 import { MainSection, LayoutSection, HeaderSection } from '../core';
@@ -30,129 +28,101 @@ import { MainSection, LayoutSection, HeaderSection } from '../core';
 type LayoutBaseProps = Pick<LayoutSectionProps, 'sx' | 'children' | 'cssVars'>;
 
 export type MainLayoutProps = LayoutBaseProps & {
-  layoutQuery?: Breakpoint;
-  slotProps?: {
-    header?: HeaderSectionProps;
-    nav?: {
-      data?: NavMainProps['data'];
-    };
-    main?: MainSectionProps;
-    footer?: FooterProps;
-  };
+   layoutQuery?: Breakpoint;
+   slotProps?: {
+      header?: HeaderSectionProps;
+      nav?: {
+         data?: NavMainProps['data'];
+      };
+      main?: MainSectionProps;
+      footer?: FooterProps;
+   };
 };
 
 export function MainLayout({
-  sx,
-  cssVars,
-  children,
-  slotProps,
-  layoutQuery = 'md',
+   sx,
+   cssVars,
+   children,
+   slotProps,
+   layoutQuery = 'md',
 }: MainLayoutProps) {
-  const pathname = usePathname();
+   const pathname = usePathname();
 
-  const { value: open, onFalse: onClose, onTrue: onOpen } = useBoolean();
+   const { value: open, onFalse: onClose, onTrue: onOpen } = useBoolean();
 
-  const isHomePage = pathname === '/';
+   const isHomePage = pathname === '/';
 
-  const navData = slotProps?.nav?.data ?? mainNavData;
+   const { user } = useAuthStore();
 
-  const renderHeader = () => {
-    const headerSlots: HeaderSectionProps['slots'] = {
-      topArea: (
-        <Alert severity="info" sx={{ display: 'none', borderRadius: 0 }}>
-          This is an info Alert.
-        </Alert>
-      ),
-      leftArea: (
-        <>
-          {/** @slot Nav mobile */}
-          <MenuButton
-            onClick={onOpen}
-            sx={(theme) => ({
-              mr: 1,
-              ml: -1,
-              [theme.breakpoints.up(layoutQuery)]: { display: 'none' },
-            })}
-          />
-          <NavMobile data={navData} open={open} onClose={onClose} />
+   const renderHeader = () => {
+      const headerSlots: HeaderSectionProps['slots'] = {
+         topArea: (
+            <Alert severity="info" sx={{ display: 'none', borderRadius: 0 }}>
+               This is an info Alert.
+            </Alert>
+         ),
+         leftArea: (
+            <>
+               {/** @slot Logo */}
+               <Logo />
+            </>
+         ),
+         rightArea: (
+            <>
+               <Box sx={{ display: 'flex', alignItems: 'center', gap: { xs: 1, sm: 1.5 } }}>
+                  {/** @slot Settings button */}
+                  <SettingsButton />
 
-          {/** @slot Logo */}
-          <Logo />
-        </>
-      ),
-      rightArea: (
-        <>
-          {/** @slot Nav desktop */}
-          <NavDesktop
-            data={navData}
-            sx={(theme) => ({
-              display: 'none',
-              [theme.breakpoints.up(layoutQuery)]: { mr: 2.5, display: 'flex' },
-            })}
-          />
+                  {/** @slot Auth button (Dashboard or Sign In) */}
+                  {user ? (
+                     <Button component={RouterLink} href={paths.dashboard.root} variant="contained">
+                        Dashboard
+                     </Button>
+                  ) : (
+                     <SignInButton />
+                  )}
+               </Box>
+            </>
+         ),
+      };
 
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: { xs: 1, sm: 1.5 } }}>
-            {/** @slot Settings button */}
-            <SettingsButton />
+      return (
+         <HeaderSection
+            layoutQuery={layoutQuery}
+            {...slotProps?.header}
+            slots={{ ...headerSlots, ...slotProps?.header?.slots }}
+            slotProps={slotProps?.header?.slotProps}
+            sx={slotProps?.header?.sx}
+         />
+      );
+   };
 
-            {/** @slot Sign in button */}
-            <SignInButton />
+   const renderFooter = () =>
+      isHomePage ? (
+         <HomeFooter sx={slotProps?.footer?.sx} />
+      ) : (
+         <Footer sx={slotProps?.footer?.sx} layoutQuery={layoutQuery} />
+      );
 
-            {/** @slot Purchase button */}
-            <Button
-              variant="contained"
-              rel="noopener noreferrer"
-              target="_blank"
-              href={paths.minimalStore}
-              sx={(theme) => ({
-                display: 'none',
-                [theme.breakpoints.up(layoutQuery)]: { display: 'inline-flex' },
-              })}
-            >
-              Purchase
-            </Button>
-          </Box>
-        </>
-      ),
-    };
+   const renderMain = () => <MainSection {...slotProps?.main}>{children}</MainSection>;
 
-    return (
-      <HeaderSection
-        layoutQuery={layoutQuery}
-        {...slotProps?.header}
-        slots={{ ...headerSlots, ...slotProps?.header?.slots }}
-        slotProps={slotProps?.header?.slotProps}
-        sx={slotProps?.header?.sx}
-      />
-    );
-  };
-
-  const renderFooter = () =>
-    isHomePage ? (
-      <HomeFooter sx={slotProps?.footer?.sx} />
-    ) : (
-      <Footer sx={slotProps?.footer?.sx} layoutQuery={layoutQuery} />
-    );
-
-  const renderMain = () => <MainSection {...slotProps?.main}>{children}</MainSection>;
-
-  return (
-    <LayoutSection
-      /** **************************************
-       * @Header
-       *************************************** */
-      headerSection={renderHeader()}
-      /** **************************************
-       * @Footer
-       *************************************** */
-      footerSection={renderFooter()}
-      /** **************************************
-       * @Styles
-       *************************************** */
-      cssVars={cssVars}
-      sx={sx}
-    >
-      {renderMain()}
-    </LayoutSection>
-  );
+   return (
+      <LayoutSection
+         /** **************************************
+          * @Header
+          *************************************** */
+         headerSection={renderHeader()}
+         /** **************************************
+          * @Footer
+          *************************************** */
+         footerSection={renderFooter()}
+         /** **************************************
+          * @Styles
+          *************************************** */
+         cssVars={cssVars}
+         sx={sx}
+      >
+         {renderMain()}
+      </LayoutSection>
+   );
 }
