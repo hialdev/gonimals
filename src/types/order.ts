@@ -29,6 +29,7 @@ export interface OrderProduct {
    product?: Product;
    price_at_order?: number;
    qty?: number;
+   has_review?: boolean;
 }
 
 export interface Order {
@@ -41,6 +42,7 @@ export interface Order {
    phone_receiver?: string;
    status?:
       | 'waiting_payment'
+      | 'waiting_confirmation'
       | 'on_progress'
       | 'finish'
       | 'stock_issue'
@@ -52,6 +54,14 @@ export interface Order {
    total_bill?: number;
    xendit_invoice_id?: string;
    xendit_invoice_url?: string;
+   bank_id?: string;
+   bank?: {
+      id?: string;
+      name?: string;
+      account_number?: string;
+      account_name?: string;
+   };
+   transfer_proof?: string;
    order_products?: OrderProduct[];
    order_logs?: any[];
 }

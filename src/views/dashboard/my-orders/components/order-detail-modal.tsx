@@ -2,6 +2,7 @@ import type { Order } from 'src/types/order';
 
 import { useEffect, useState } from 'react';
 import dayjs from 'dayjs';
+import { useBoolean } from 'minimal-shared/hooks';
 
 import Box from '@mui/material/Box';
 import Chip from '@mui/material/Chip';
@@ -27,6 +28,7 @@ import TimelineOppositeContent from '@mui/lab/TimelineOppositeContent';
 import { Iconify } from 'src/components/iconify';
 import { fCurrency } from 'src/utils/format-number';
 import { CONFIG } from 'src/global-config';
+import { ReviewModal } from './review-modal';
 // import useOrderLogStatusStore from 'src/stores/order-log-status';
 
 // ----------------------------------------------------------------------
@@ -41,10 +43,14 @@ export function OrderDetailModal({ open, onClose, order }: Props) {
    const logs = order.order_logs || [];
    const loading = false; // Data is preloaded now
 
+   const reviewModal = useBoolean();
+   const [selectedProduct, setSelectedProduct] = useState<any>(null);
+
    // Removed fetchLogs and store usage since data is passed via props
 
    const statusColor = {
       waiting_payment: 'warning',
+      waiting_confirmation: 'info',
       on_progress: 'info',
       finish: 'success',
       stock_issue: 'error',
@@ -56,6 +62,7 @@ export function OrderDetailModal({ open, onClose, order }: Props) {
 
    const statusLabel = {
       waiting_payment: 'Waiting Payment',
+      waiting_confirmation: 'Waiting Confirmation',
       on_progress: 'On Progress',
       finish: 'Finished',
       stock_issue: 'Stock Issue',
@@ -214,11 +221,33 @@ export function OrderDetailModal({ open, onClose, order }: Props) {
                                  </Typography>
                               </Box>
 
-                              {/* Subtotal */}
-                              <Box sx={{ textAlign: 'right' }}>
+                              {/* Subtotal & Actions */}
+                              <Box
+                                 sx={{
+                                    textAlign: 'right',
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    gap: 1,
+                                    alignItems: 'flex-end',
+                                 }}
+                              >
                                  <Typography variant="subtitle2" color="primary.main">
                                     {fCurrency(subtotal)}
                                  </Typography>
+                                 {order.status === 'finish' && !item.has_review && (
+                                    <Button
+                                       size="small"
+                                       variant="outlined"
+                                       color="primary"
+                                       onClick={() => {
+                                          setSelectedProduct(item);
+                                          reviewModal.onTrue();
+                                       }}
+                                       startIcon={<Iconify icon="solar:star-bold" />}
+                                    >
+                                       Review
+                                    </Button>
+                                 )}
                               </Box>
                            </Box>
                         );
@@ -390,6 +419,18 @@ export function OrderDetailModal({ open, onClose, order }: Props) {
                Close
             </Button>
          </DialogActions>
+
+         {selectedProduct && (
+            <ReviewModal
+               open={reviewModal.value}
+               onClose={() => {
+                  reviewModal.onFalse();
+                  setSelectedProduct(null);
+               }}
+               orderId={order.id!}
+               orderProduct={selectedProduct}
+            />
+         )}
       </Dialog>
    );
 }

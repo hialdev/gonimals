@@ -96,6 +96,10 @@ export const paths = {
       },
 
       // E-Commerce - Purchasing
+      banks: {
+         root: `${ROOTS.DASHBOARD}/banks`,
+      },
+
       purchases: {
          root: `${ROOTS.DASHBOARD}/purchases`,
          create: `${ROOTS.DASHBOARD}/purchases/create`,

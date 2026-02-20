@@ -1,4 +1,4 @@
-"use client"
+'use client';
 
 import type { TabProps } from '@mui/material/Tab';
 
@@ -16,7 +16,7 @@ import Button from '@mui/material/Button';
 import Typography from '@mui/material/Typography';
 
 import { paths } from 'src/routes/al/paths';
-import { useRouter } from 'src/routes/hooks';
+import { useRouter, useSearchParams } from 'src/routes/hooks';
 
 import useAuthStore from 'src/stores/auth';
 
@@ -29,7 +29,10 @@ import { Form, Field, schemaUtils } from 'src/components/hook-form';
 export type SignInType = z.infer<typeof SignInSchema>;
 
 export const SignInSchema = z.object({
-   phoneNumber: schemaUtils.phoneNumber({ isValid: isValidPhoneNumber }).optional().or(z.literal('')),
+   phoneNumber: schemaUtils
+      .phoneNumber({ isValid: isValidPhoneNumber })
+      .optional()
+      .or(z.literal('')),
    email: schemaUtils.email().optional().or(z.literal('')),
    phoneNumber_country_code: z.string().optional(),
 });
@@ -51,6 +54,8 @@ const TABS: TabProps[] = [
 
 export default function SignInView() {
    const router = useRouter();
+   const searchParams = useSearchParams();
+   const returnTo = searchParams.get('returnTo') || '';
    const [activeTab, setActiveTab] = useState<string>('phone');
    const { setRegist, sendOTP } = useAuthStore();
 
@@ -109,17 +114,24 @@ export default function SignInView() {
       if (!isValid) return;
       const isUseEmail = activeTab === 'email';
       try {
-         const send = await sendOTP(
-            {
-               login: isUseEmail && data.email ? data.email : (data.phoneNumber ?? ''),
-               isEmail: isUseEmail,
-               country_code: (data.phoneNumber_country_code ?? 'ID')
-            })
+         const send = await sendOTP({
+            login: isUseEmail && data.email ? data.email : (data.phoneNumber ?? ''),
+            isEmail: isUseEmail,
+            country_code: data.phoneNumber_country_code ?? 'ID',
+         });
          if (send.success) {
-            toast.info('Permintaan berhasil, mengalihkan ke halaman verifikasi...')
-            setRegist({ isEmail: isUseEmail, phone: data.phoneNumber ?? null, email: data.email ?? null, purpose: send.data?.purpose })
+            toast.info('Permintaan berhasil, mengalihkan ke halaman verifikasi...');
+            setRegist({
+               isEmail: isUseEmail,
+               phone: data.phoneNumber ?? null,
+               email: data.email ?? null,
+               purpose: send.data?.purpose,
+            });
             reset();
-            router.push(paths.auth.verify)
+            const verifyPath = returnTo
+               ? `${paths.auth.verify}?returnTo=${encodeURIComponent(returnTo)}`
+               : paths.auth.verify;
+            router.push(verifyPath);
          } else {
             toast.error(send.message);
          }
@@ -130,9 +142,7 @@ export default function SignInView() {
 
    return (
       <Form methods={methods} onSubmit={onSubmit}>
-         <Box
-            sx={{ mb: 2 }}
-         >
+         <Box sx={{ mb: 2 }}>
             <Typography variant="h4" gutterBottom>
                Sign in
             </Typography>
@@ -140,13 +150,8 @@ export default function SignInView() {
                Masuk menggunakan nomor whatsapp atau email.
             </Typography>
          </Box>
-         <Box
-            sx={{ mb: 3 }}
-         >
-            <Tabs
-               value={activeTab}
-               onChange={(_, newValue) => setActiveTab(newValue)}
-            >
+         <Box sx={{ mb: 3 }}>
+            <Tabs value={activeTab} onChange={(_, newValue) => setActiveTab(newValue)}>
                {TABS.map((tab) => (
                   <Tab
                      iconPosition="start"
@@ -170,8 +175,7 @@ export default function SignInView() {
                <Field.Phone name="phoneNumber" label="Whatsapp number" defaultCountry="ID" />
             ) : (
                <Field.Text name="email" label="Email address" />
-            )
-            }
+            )}
          </Box>
 
          <Stack sx={{ my: 3, alignItems: 'flex-end' }}>

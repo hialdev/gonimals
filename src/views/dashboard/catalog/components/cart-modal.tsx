@@ -21,6 +21,7 @@ import useCartStore from 'src/stores/cart';
 import { toast } from 'src/components/snackbar';
 import { Iconify } from 'src/components/iconify';
 import { fCurrency } from 'src/utils/format-number';
+import useAuthStore from 'src/stores/auth';
 
 // ----------------------------------------------------------------------
 
@@ -31,6 +32,7 @@ type Props = {
 
 export function CartModal({ open, onClose }: Props) {
    const router = useRouter();
+   const { user } = useAuthStore();
    const {
       items,
       updateQty,
@@ -65,6 +67,14 @@ export function CartModal({ open, onClose }: Props) {
    };
 
    const handleCheckout = async () => {
+      if (!user) {
+         toast.error('Silakan login terlebih dahulu untuk checkout');
+         const returnTo = encodeURIComponent(paths.dashboard.customer_orders.checkout);
+         router.push(`${paths.auth.signIn}?returnTo=${returnTo}`);
+         onClose();
+         return;
+      }
+
       if (items.length === 0) {
          toast.error('Keranjang kosong');
          return;

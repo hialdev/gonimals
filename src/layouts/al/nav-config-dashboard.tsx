@@ -87,8 +87,15 @@ export const navData: NavSectionProps['data'] = [
             icon: icon('solar:users-group-two-rounded-bold-duotone'),
             requiredPermissions: ['Read Principle'],
          },
+         {
+            title: 'Banks',
+            path: paths.dashboard.banks.root,
+            icon: icon('solar:card-bold-duotone'),
+            requiredPermissions: ['Add Principle'],
+         },
       ],
    },
+
    /**
     * Purchasing
     */

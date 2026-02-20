@@ -12,31 +12,24 @@ import Fab from '@mui/material/Fab';
 import Badge from '@mui/material/Badge';
 import Container from '@mui/material/Container';
 import Typography from '@mui/material/Typography';
-
-import { paths } from 'src/routes/al/paths';
+import { alpha } from '@mui/material/styles';
 
 import useCartStore from 'src/stores/cart';
 import useProductStore from 'src/stores/product';
-import { DashboardContent } from 'src/layouts/dashboard';
 
 import { toast } from 'src/components/snackbar';
 import { Iconify } from 'src/components/iconify';
 import { LoadingScreen } from 'src/components/loading-screen';
-import { CustomBreadcrumbs } from 'src/components/custom-breadcrumbs';
 
-import { ProductCard } from './components/product-card';
-import { CartModal } from './components/cart-modal';
-import { AddToCartModal } from './components/add-to-cart-modal';
-import { ProductDetailsModal } from './components/product-details-modal';
-import { ReviewListModal } from './components/review-list-modal';
+import { ProductCard } from '../../dashboard/catalog/components/product-card';
+import { CartModal } from '../../dashboard/catalog/components/cart-modal';
+import { AddToCartModal } from '../../dashboard/catalog/components/add-to-cart-modal';
 
 // ----------------------------------------------------------------------
 
-export function CatalogView() {
+export function HomeView() {
    const cartModal = useBoolean();
    const addToCartModal = useBoolean();
-   const detailsModal = useBoolean();
-   const reviewsModal = useBoolean();
 
    const { products, getCatalog: getProducts } = useProductStore();
    const { getItemCount } = useCartStore();
@@ -74,30 +67,7 @@ export function CatalogView() {
       addToCartModal.onFalse();
    };
 
-   const handleOpenDetails = (product: Product) => {
-      setSelectedProduct(product);
-      detailsModal.onTrue();
-   };
-
-   const handleCloseDetails = () => {
-      setSelectedProduct(null);
-      detailsModal.onFalse();
-   };
-
-   const handleOpenReviews = (product: Product) => {
-      setSelectedProduct(product);
-      reviewsModal.onTrue();
-   };
-
-   const handleCloseReviews = () => {
-      if (!detailsModal.value && !addToCartModal.value) {
-         setSelectedProduct(null);
-      }
-      reviewsModal.onFalse();
-   };
-
    const cartItemCount = getItemCount();
-
    const [mounted, setMounted] = useState(false);
 
    useEffect(() => {
@@ -106,13 +76,25 @@ export function CatalogView() {
 
    return (
       <>
-         <DashboardContent>
-            <CustomBreadcrumbs
-               heading="Catalog"
-               links={[{ name: 'Dashboard', href: paths.dashboard.root }, { name: 'Catalog' }]}
-               sx={{ mb: { xs: 3, md: 5 } }}
-            />
+         <Box
+            sx={{
+               py: { xs: 10, md: 15 },
+               px: 3,
+               mb: 8,
+               bgcolor: (theme) => alpha(theme.palette.primary.main, 0.08),
+               textAlign: 'center',
+            }}
+         >
+            <Typography variant="h2" sx={{ mb: 2 }}>
+               Selamat Datang di Gonimals
+            </Typography>
+            <Typography variant="body1" sx={{ color: 'text.secondary', maxWidth: 600, mx: 'auto' }}>
+               Jelajahi koleksi hewan dan produk terbaik kami. Nikmati kemudahan berbelanja dengan
+               pelayanan terbaik hanya untuk Anda.
+            </Typography>
+         </Box>
 
+         <Container maxWidth="xl" sx={{ mb: 10 }}>
             {loading ? (
                <LoadingScreen />
             ) : (
@@ -130,8 +112,6 @@ export function CatalogView() {
                               <ProductCard
                                  product={product}
                                  onAddToCart={() => handleOpenAddToCart(product)}
-                                 onViewDetails={() => handleOpenDetails(product)}
-                                 onViewReviews={() => handleOpenReviews(product)}
                               />
                            </Grid>
                         ))}
@@ -139,7 +119,7 @@ export function CatalogView() {
                   )}
                </>
             )}
-         </DashboardContent>
+         </Container>
 
          {/* Floating Cart Button */}
          <Fab
@@ -164,29 +144,6 @@ export function CatalogView() {
                open={addToCartModal.value}
                onClose={handleCloseAddToCart}
                product={selectedProduct}
-            />
-         )}
-
-         {/* Product Details Modal */}
-         {selectedProduct && (
-            <ProductDetailsModal
-               open={detailsModal.value}
-               onClose={handleCloseDetails}
-               product={selectedProduct}
-               onAddToCart={() => {
-                  detailsModal.onFalse();
-                  addToCartModal.onTrue();
-               }}
-            />
-         )}
-
-         {/* Review List Modal */}
-         {selectedProduct && (
-            <ReviewListModal
-               open={reviewsModal.value}
-               onClose={handleCloseReviews}
-               productId={selectedProduct.id || null}
-               productTitle={selectedProduct.title}
             />
          )}
 

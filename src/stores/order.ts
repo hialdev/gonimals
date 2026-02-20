@@ -35,6 +35,9 @@ interface OrderState {
    adminCancel: ({ id, data }: { id: string; data: FormData }) => Promise<any>;
    adminConfirmRestock: ({ id, data }: { id: string; data: FormData }) => Promise<any>;
    adminFinish: ({ id, data }: { id: string; data: FormData }) => Promise<any>;
+   confirmPayment: ({ id }: { id: string }) => Promise<any>;
+   rejectPayment: ({ id, reason }: { id: string; reason?: string }) => Promise<any>;
+   uploadTransferProof: ({ id, data }: { id: string; data: FormData }) => Promise<any>;
 }
 
 const useOrderStore = create<OrderState>()(
@@ -139,6 +142,28 @@ const useOrderStore = create<OrderState>()(
             const response = await protectedApi.post(`/orders/${id}/admin-finish`, data, {
                headers: { 'Content-Type': 'multipart/form-data' },
             });
+            return response.data;
+         },
+         confirmPayment: async ({ id }) => {
+            const response = await protectedApi.post(`/orders/${id}/confirm-payment`);
+            return response.data;
+         },
+         rejectPayment: async ({ id, reason }) => {
+            const form = new FormData();
+            if (reason) form.append('reason', reason);
+            const response = await protectedApi.post(`/orders/${id}/reject-payment`, form, {
+               headers: { 'Content-Type': 'multipart/form-data' },
+            });
+            return response.data;
+         },
+         uploadTransferProof: async ({ id, data }) => {
+            const response = await protectedApi.post(
+               `/user/my-orders/${id}/upload-transfer`,
+               data,
+               {
+                  headers: { 'Content-Type': 'multipart/form-data' },
+               }
+            );
             return response.data;
          },
       }),

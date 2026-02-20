@@ -19,14 +19,18 @@ import useFavoriteStore from 'src/stores/favorite';
 import { Iconify } from 'src/components/iconify';
 import { fCurrency } from 'src/utils/format-number';
 
+import { ProductRating } from './product-rating';
+
 // ----------------------------------------------------------------------
 
 type Props = {
    product: Product;
    onAddToCart: () => void;
+   onViewDetails?: () => void;
+   onViewReviews?: () => void;
 };
 
-export function ProductCard({ product, onAddToCart }: Props) {
+export function ProductCard({ product, onAddToCart, onViewDetails, onViewReviews }: Props) {
    const { isFavorite, toggleFavorite } = useFavoriteStore();
    const [isFav, setIsFav] = useState(isFavorite(product.id!));
 
@@ -72,21 +76,31 @@ export function ProductCard({ product, onAddToCart }: Props) {
             />
          </IconButton>
 
-         {/* Product Image */}
          <CardMedia
             component="img"
             height="200"
             image={imageUrl}
             alt={product.title}
+            onClick={onViewDetails}
             sx={{
                objectFit: 'cover',
                bgcolor: 'background.neutral',
+               cursor: onViewDetails ? 'pointer' : 'default',
             }}
          />
 
          <CardContent sx={{ flexGrow: 1 }}>
             {/* Product Title */}
-            <Typography variant="h6" gutterBottom noWrap>
+            <Typography
+               variant="h6"
+               gutterBottom
+               noWrap
+               onClick={onViewDetails}
+               sx={{
+                  cursor: onViewDetails ? 'pointer' : 'default',
+                  '&:hover': { color: onViewDetails ? 'primary.main' : 'inherit' },
+               }}
+            >
                {product.title}
             </Typography>
 
@@ -113,17 +127,28 @@ export function ProductCard({ product, onAddToCart }: Props) {
                {fCurrency(product.sale_price || 0)}
             </Typography>
 
-            {/* Stock Info */}
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-               <Typography variant="caption" color="text.secondary">
-                  Stock:
-               </Typography>
-               <Chip
-                  label={isOutOfStock ? 'Out of Stock' : `${stock} available`}
-                  size="small"
-                  color={isOutOfStock ? 'error' : 'success'}
-                  variant="outlined"
-               />
+            <Box
+               sx={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  mb: 1,
+               }}
+            >
+               {/* Stock Info */}
+               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <Typography variant="caption" color="text.secondary">
+                     Stock:
+                  </Typography>
+                  <Chip
+                     label={isOutOfStock ? 'Out of Stock' : `${stock} available`}
+                     size="small"
+                     color={isOutOfStock ? 'error' : 'success'}
+                     variant="outlined"
+                  />
+               </Box>
+
+               <ProductRating productId={product.id!} onClick={onViewReviews} />
             </Box>
          </CardContent>
 

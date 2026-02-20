@@ -1,19 +1,14 @@
 import type { Metadata } from 'next';
 
-import { redirect } from 'next/navigation';
-
-import { paths } from 'src/routes/al/paths';
-
+import { HomeView } from 'src/views/home/view/home-view';
 
 // ----------------------------------------------------------------------
 
-export const metadata: Metadata = {
-  title: 'RKG Tour and Travel Dashbaord',
-  description:
-    'This is an Admin Dashsboard for RKG Tour and Travel, manage all contents of official sites and web apps',
+export const metadata = {
+   title: 'Gonimals - Home',
+   description: 'Welcome to Gonimals. Explore our best animal products and supplies.',
 };
 
 export default function Page() {
-  return redirect(paths.dashboard.root);
+   return <HomeView />;
 }
-    

@@ -16,12 +16,17 @@ import { Iconify } from 'src/components/iconify';
 import { fCurrency } from 'src/utils/format-number';
 import { usePopover } from 'minimal-shared/hooks';
 import { CustomPopover } from 'src/components/custom-popover';
+import useOrderStore from 'src/stores/order';
 
 import { OrderDetailModal } from './order-detail-modal';
 import { RefundModal } from './refund-modal';
 import { CancelModal } from './cancel-modal';
 import { ConfirmRestockModal } from './confirm-restock-modal';
 import { FinishModal } from './finish-modal';
+import { ConfirmPaymentModal } from './confirm-payment-modal';
+import { OrderReviewsModal } from './order-reviews-modal';
+
+// ----------------------------------------------------------------------
 
 // ----------------------------------------------------------------------
 
@@ -32,14 +37,18 @@ type Props = {
 
 export function OrderTableRow({ row, onActionSuccess }: Props) {
    const popover = usePopover();
+   const { confirmPayment, rejectPayment } = useOrderStore();
    const [openDetailModal, setOpenDetailModal] = useState(false);
    const [openRefundModal, setOpenRefundModal] = useState(false);
    const [openCancelModal, setOpenCancelModal] = useState(false);
    const [openRestockModal, setOpenRestockModal] = useState(false);
    const [openFinishModal, setOpenFinishModal] = useState(false);
+   const [openConfirmPaymentModal, setOpenConfirmPaymentModal] = useState(false);
+   const [openReviewsModal, setOpenReviewsModal] = useState(false);
 
    const statusColor = {
       waiting_payment: 'warning',
+      waiting_confirmation: 'info',
       on_progress: 'info',
       finish: 'success',
       stock_issue: 'error',
@@ -51,6 +60,7 @@ export function OrderTableRow({ row, onActionSuccess }: Props) {
 
    const statusLabel = {
       waiting_payment: 'Waiting Payment',
+      waiting_confirmation: 'Menunggu Konfirmasi',
       on_progress: 'On Progress',
       finish: 'Finished',
       stock_issue: 'Stock Issue',
@@ -70,6 +80,8 @@ export function OrderTableRow({ row, onActionSuccess }: Props) {
       row.status !== 'finish' && row.status !== 'refunded' && row.status !== 'canceled';
    const canConfirmRestock = row.status === 'waiting_restock';
    const canFinish = row.status === 'on_progress';
+   const canConfirmPayment = row.status === 'waiting_confirmation';
+   const canViewReviews = row.status === 'finish';
 
    return (
       <>
@@ -108,6 +120,19 @@ export function OrderTableRow({ row, onActionSuccess }: Props) {
 
          <CustomPopover open={popover.open} anchorEl={popover.anchorEl} onClose={popover.onClose}>
             <MenuList>
+               {canConfirmPayment && (
+                  <MenuItem
+                     onClick={() => {
+                        setOpenConfirmPaymentModal(true);
+                        popover.onClose();
+                     }}
+                     sx={{ color: 'success.main' }}
+                  >
+                     <Iconify icon="solar:check-circle-bold" />
+                     Konfirmasi Pembayaran
+                  </MenuItem>
+               )}
+
                {canRefund && (
                   <MenuItem
                      onClick={() => {
@@ -141,6 +166,18 @@ export function OrderTableRow({ row, onActionSuccess }: Props) {
                   >
                      <Iconify icon="solar:check-circle-bold" />
                      Mark as Finished
+                  </MenuItem>
+               )}
+
+               {canViewReviews && (
+                  <MenuItem
+                     onClick={() => {
+                        setOpenReviewsModal(true);
+                        popover.onClose();
+                     }}
+                  >
+                     <Iconify icon="solar:star-bold" />
+                     Lihat Ulasan
                   </MenuItem>
                )}
 
@@ -200,6 +237,21 @@ export function OrderTableRow({ row, onActionSuccess }: Props) {
                onSuccess={handleActionSuccess}
             />
          )}
+         {canConfirmPayment && (
+            <ConfirmPaymentModal
+               open={openConfirmPaymentModal}
+               onClose={() => setOpenConfirmPaymentModal(false)}
+               order={row}
+               onSuccess={handleActionSuccess}
+            />
+         )}
+
+         <OrderReviewsModal
+            open={openReviewsModal}
+            onClose={() => setOpenReviewsModal(false)}
+            orderId={row.id!}
+            orderNumber={row.order_number}
+         />
       </>
    );
 }

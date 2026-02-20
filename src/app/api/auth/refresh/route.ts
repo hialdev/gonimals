@@ -44,7 +44,10 @@ async function handleRefresh(req: NextRequest) {
             if (!res.ok) {
                console.error(`[${timestamp}] [REFRESH] Backend failed:`, res.status);
                return NextResponse.redirect(
-                  new URL(paths.auth.signIn, process.env.NEXT_PUBLIC_APP_URL)
+                  new URL(
+                     `${paths.auth.signIn}?returnTo=${encodeURIComponent(returnTo)}`,
+                     process.env.NEXT_PUBLIC_APP_URL
+                  )
                );
             }
 
@@ -55,7 +58,10 @@ async function handleRefresh(req: NextRequest) {
             if (!at) {
                console.error(`[${timestamp}] [REFRESH] No access token in response`);
                return NextResponse.redirect(
-                  new URL(paths.auth.signIn, process.env.NEXT_PUBLIC_APP_URL)
+                  new URL(
+                     `${paths.auth.signIn}?returnTo=${encodeURIComponent(returnTo)}`,
+                     process.env.NEXT_PUBLIC_APP_URL
+                  )
                );
             }
 
@@ -86,11 +92,19 @@ async function handleRefresh(req: NextRequest) {
             return response;
          } catch {
             return NextResponse.redirect(
-               new URL(paths.auth.signIn, process.env.NEXT_PUBLIC_APP_URL)
+               new URL(
+                  `${paths.auth.signIn}?returnTo=${encodeURIComponent(returnTo)}`,
+                  process.env.NEXT_PUBLIC_APP_URL
+               )
             );
          }
       } else {
-         return NextResponse.redirect(new URL(paths.auth.signIn, process.env.NEXT_PUBLIC_APP_URL));
+         return NextResponse.redirect(
+            new URL(
+               `${paths.auth.signIn}?returnTo=${encodeURIComponent(returnTo)}`,
+               process.env.NEXT_PUBLIC_APP_URL
+            )
+         );
       }
    }
    return NextResponse.redirect(new URL(paths.auth.signIn, process.env.NEXT_PUBLIC_APP_URL));

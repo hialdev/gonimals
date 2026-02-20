@@ -17,6 +17,7 @@ import useOrderStore from 'src/stores/order';
 
 import { OrderDetailModal } from './order-detail-modal';
 import { StockIssueModal } from './stock-issue-modal';
+import { OrderReviewsModal } from '../../orders/components/order-reviews-modal';
 
 // ----------------------------------------------------------------------
 
@@ -28,11 +29,13 @@ type Props = {
 export function OrderTableRow({ row, onActionSuccess }: Props) {
    const [openDetailModal, setOpenDetailModal] = useState(false);
    const [openStockIssueModal, setOpenStockIssueModal] = useState(false);
+   const [openReviewsModal, setOpenReviewsModal] = useState(false);
 
    const { requestRefund, waitRestock } = useOrderStore();
 
    const statusColor = {
       waiting_payment: 'warning',
+      waiting_confirmation: 'info',
       on_progress: 'info',
       finish: 'success',
       stock_issue: 'error',
@@ -44,6 +47,7 @@ export function OrderTableRow({ row, onActionSuccess }: Props) {
 
    const statusLabel = {
       waiting_payment: 'Waiting Payment',
+      waiting_confirmation: 'Waiting Confirmation',
       on_progress: 'On Progress',
       finish: 'Finish',
       stock_issue: 'Stock Issue',
@@ -137,6 +141,11 @@ export function OrderTableRow({ row, onActionSuccess }: Props) {
             </TableCell>
 
             <TableCell align="right">
+               {row.status === 'finish' && (
+                  <IconButton onClick={() => setOpenReviewsModal(true)}>
+                     <Iconify icon="solar:star-bold" sx={{ color: 'warning.main' }} />
+                  </IconButton>
+               )}
                <IconButton onClick={handleOpenModal}>
                   <Iconify icon="solar:eye-bold" />
                </IconButton>
@@ -154,6 +163,13 @@ export function OrderTableRow({ row, onActionSuccess }: Props) {
                onWaitRestock={handleWaitRestock}
             />
          )}
+
+         <OrderReviewsModal
+            open={openReviewsModal}
+            onClose={() => setOpenReviewsModal(false)}
+            orderId={row.id!}
+            orderNumber={row.order_number}
+         />
       </>
    );
 }

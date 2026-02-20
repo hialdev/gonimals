@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { protectedApi } from '../lib/al/axios';
+import { api, protectedApi } from '../lib/al/axios';
 import type { Product } from '../types/product';
 
 export interface CartItem {
@@ -95,7 +95,7 @@ const useCartStore = create<CartState>()(
 
          validateStock: async (productId, qty) => {
             try {
-               const response = await protectedApi.get(`/catalog/stock/${productId}`);
+               const response = await api.get(`/catalog/stock/${productId}`);
                if (response.data.success && response.data.data) {
                   const product = response.data.data;
                   const availableStock = product.stock || 0;

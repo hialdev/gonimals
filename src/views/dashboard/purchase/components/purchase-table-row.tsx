@@ -23,6 +23,7 @@ import { Iconify } from 'src/components/iconify';
 import { ConfirmDialog } from 'src/components/custom-dialog';
 
 import { PurchaseProductsModal } from './purchase-products-modal';
+import { PurchaseReceiveModal } from './purchase-receive-modal';
 
 // ----------------------------------------------------------------------
 
@@ -38,33 +39,10 @@ export function PurchaseTableRow({ row, selected, onSelectRow, onDeleteRow, onRe
    const router = useRouter();
    const confirmDialog = useBoolean();
    const productsModal = useBoolean();
-   const finishDialog = useBoolean();
-   const [finishing, setFinishing] = useState(false);
-   const { finish } = usePurchaseStore();
+   const receiveModal = useBoolean();
 
    const handleEdit = () => {
       router.push(paths.dashboard.purchases.edit(row.id!));
-   };
-
-   const handleFinish = async () => {
-      setFinishing(true);
-      try {
-         const result = await finish({ id: row.id! });
-         if (result.success) {
-            toast.success(
-               'Purchase berhasil di-finish! Stock telah diupdate dan purchase terkunci.'
-            );
-            finishDialog.onFalse();
-            if (onRefresh) onRefresh();
-         } else {
-            toast.error(result.message || 'Gagal finish purchase');
-         }
-      } catch (error) {
-         console.error(error);
-         toast.error('Terjadi kesalahan saat finish purchase');
-      } finally {
-         setFinishing(false);
-      }
    };
 
    // Calculate total from purchase_products (backend sends this, not 'items')
@@ -83,6 +61,9 @@ export function PurchaseTableRow({ row, selected, onSelectRow, onDeleteRow, onRe
                <Typography variant="body2">{fDate(row.purchase_date)}</Typography>
                {isFinished && (
                   <Chip label="Finished" size="small" color="success" sx={{ mt: 0.5 }} />
+               )}
+               {row.status === 'partial' && !isFinished && (
+                  <Chip label="Partial Receive" size="small" color="warning" sx={{ mt: 0.5 }} />
                )}
             </TableCell>
 
@@ -124,13 +105,15 @@ export function PurchaseTableRow({ row, selected, onSelectRow, onDeleteRow, onRe
             </TableCell>
 
             <TableCell align="right" sx={{ px: 1, whiteSpace: 'nowrap' }}>
-               {!isFinished && (
-                  <Tooltip title="Finish" placement="top" arrow>
-                     <IconButton color="success" onClick={finishDialog.onTrue}>
-                        <Iconify icon="solar:check-circle-bold" />
-                     </IconButton>
-                  </Tooltip>
-               )}
+               <Tooltip
+                  title={isFinished ? 'View Receive History' : 'Receive Products'}
+                  placement="top"
+                  arrow
+               >
+                  <IconButton color={isFinished ? 'default' : 'info'} onClick={receiveModal.onTrue}>
+                     <Iconify icon="solar:box-minimalistic-bold" />
+                  </IconButton>
+               </Tooltip>
 
                <Tooltip
                   title={isFinished ? 'Cannot edit finished purchase' : 'Edit'}
@@ -170,50 +153,11 @@ export function PurchaseTableRow({ row, selected, onSelectRow, onDeleteRow, onRe
             }
          />
 
-         <ConfirmDialog
-            open={finishDialog.value}
-            onClose={finishDialog.onFalse}
-            title="Finish Purchase"
-            content={
-               <>
-                  <Typography variant="body2" sx={{ mb: 2 }}>
-                     Apakah Anda yakin ingin finish purchase ini?
-                  </Typography>
-                  <Box
-                     sx={{
-                        p: 2,
-                        bgcolor: 'warning.lighter',
-                        borderRadius: 1,
-                        border: '1px solid',
-                        borderColor: 'warning.main',
-                     }}
-                  >
-                     <Typography variant="body2" sx={{ fontWeight: 600, mb: 1 }}>
-                        ⚠️ Perhatian:
-                     </Typography>
-                     <Typography variant="caption" component="div">
-                        • Stock produk akan diupdate
-                     </Typography>
-                     <Typography variant="caption" component="div">
-                        • Purchase akan terkunci dan tidak bisa diedit lagi
-                     </Typography>
-                     <Typography variant="caption" component="div">
-                        • Stock movement akan tercatat
-                     </Typography>
-                  </Box>
-               </>
-            }
-            action={
-               <Button
-                  variant="contained"
-                  color="success"
-                  onClick={handleFinish}
-                  disabled={finishing}
-                  startIcon={<Iconify icon="solar:check-circle-bold" />}
-               >
-                  {finishing ? 'Processing...' : 'Finish Purchase'}
-               </Button>
-            }
+         <PurchaseReceiveModal
+            open={receiveModal.value}
+            onClose={receiveModal.onFalse}
+            purchase={row}
+            onRefresh={onRefresh}
          />
 
          <PurchaseProductsModal

@@ -46,8 +46,10 @@ const TABLE_HEAD: TableHeadCellProps[] = [
 const STATUS_OPTIONS = [
    { value: '', label: 'All Status' },
    { value: 'waiting_payment', label: 'Waiting Payment' },
+   { value: 'waiting_confirmation', label: 'Waiting Confirmation' },
    { value: 'on_progress', label: 'On Progress' },
    { value: 'finish', label: 'Finish' },
+
    { value: 'stock_issue', label: 'Stock Issue' },
    { value: 'waiting_restock', label: 'Waiting Restock' },
    { value: 'refund_pending', label: 'Refund Pending' },

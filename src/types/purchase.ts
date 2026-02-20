@@ -15,6 +15,7 @@ export type PurchaseItemFormType = z.infer<typeof PurchaseItemSchema>;
 export const PurchaseSchema = z.object({
    principle_id: z.string().min(1, { message: 'Supplier is required!' }),
    purchase_date: z.string().min(1, { message: 'Purchase Date is required!' }),
+   expected_arrival_date: z.string().optional(),
    notes: z.string().optional(),
    items: z.array(PurchaseItemSchema).min(1, { message: 'At least one product is required!' }),
 });
@@ -30,6 +31,8 @@ export interface PurchaseProduct {
    product_id?: string;
    product?: Product;
    qty?: number;
+   received_qty?: number;
+   remaining_qty?: number; // computed by backend
    purchase_price?: number;
    subtotal?: number;
 }
@@ -40,7 +43,9 @@ export interface Purchase {
    updated_at?: string;
    purchase_number?: string;
    purchase_date?: string;
-   status?: 'draft' | 'completed' | 'cancelled';
+   expected_arrival_date?: string;
+   received_date?: string;
+   status?: 'draft' | 'completed' | 'cancelled' | 'partial';
    is_clear?: boolean;
    principle_id?: string;
    principle?: Principle;

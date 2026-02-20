@@ -57,6 +57,7 @@ export function OrderDetailModal({ open, onClose, order }: Props) {
 
    const statusColor: Record<string, any> = {
       waiting_payment: 'warning',
+      waiting_confirmation: 'info',
       on_progress: 'info',
       finish: 'success',
       stock_issue: 'error',
@@ -68,6 +69,7 @@ export function OrderDetailModal({ open, onClose, order }: Props) {
 
    const statusLabel: Record<string, string> = {
       waiting_payment: 'Waiting Payment',
+      waiting_confirmation: 'Waiting Confirmation',
       on_progress: 'On Progress',
       finish: 'Finished',
       stock_issue: 'Stock Issue',

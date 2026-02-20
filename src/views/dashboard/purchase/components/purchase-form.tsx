@@ -70,6 +70,7 @@ export function PurchaseForm({ currentPurchase }: Props) {
    const defaultValues: PurchaseFormType = {
       principle_id: currentPurchase?.principle_id || '',
       purchase_date: currentPurchase?.purchase_date || new Date().toISOString().split('T')[0],
+      expected_arrival_date: currentPurchase?.expected_arrival_date || '',
       notes: currentPurchase?.notes || '',
       items: convertPurchaseProductsToFormItems(
          currentPurchase?.purchase_products || currentPurchase?.items
@@ -103,6 +104,9 @@ export function PurchaseForm({ currentPurchase }: Props) {
             purchase_date: data.purchase_date
                ? new Date(data.purchase_date).toISOString()
                : new Date().toISOString(),
+            expected_arrival_date: data.expected_arrival_date
+               ? new Date(data.expected_arrival_date).toISOString()
+               : undefined,
             status: currentPurchase?.status || 'completed', // Preserve existing or default
             principle_id: data.principle_id,
             notes: data.notes || '',
@@ -181,6 +185,7 @@ export function PurchaseForm({ currentPurchase }: Props) {
                      />
 
                      <Field.DatePicker name="purchase_date" label="Purchase Date" />
+                     <Field.DatePicker name="expected_arrival_date" label="Expected Arrival Date" />
 
                      <Field.Text
                         multiline

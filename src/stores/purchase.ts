@@ -14,6 +14,8 @@ interface PurchaseState {
    add: ({ data }: { data: any }) => Promise<any>;
    update: ({ id, data }: { id: string; data: any }) => Promise<any>;
    finish: ({ id }: { id: string }) => Promise<any>;
+   receive: ({ id, data }: { id: string; data: any }) => Promise<any>;
+   getLogs: ({ id }: { id: string }) => Promise<any>;
    delete: ({ id }: { id: string }) => Promise<any>;
 }
 
@@ -27,10 +29,18 @@ const usePurchaseStore = create<PurchaseState>()(
             if (params) {
                if (params.page !== undefined) queryParams.append('page', params.page.toString());
                if (params.limit !== undefined) queryParams.append('limit', params.limit.toString());
-               if (params.search !== undefined) queryParams.append('search', params.search);
+               if (params.search !== undefined && params.search !== '')
+                  queryParams.append('search', params.search);
                if (params.sort !== undefined) queryParams.append('sort', params.sort);
                if (params.order !== undefined) queryParams.append('order', params.order);
-               if (params.status !== undefined) queryParams.append('status', params.status);
+               if (params.status !== undefined && params.status !== '')
+                  queryParams.append('status', params.status);
+               if (params.principle_ids !== undefined && params.principle_ids !== '')
+                  queryParams.append('principle_ids', params.principle_ids);
+               if (params.start_date !== undefined && params.start_date !== '')
+                  queryParams.append('start_date', params.start_date);
+               if (params.end_date !== undefined && params.end_date !== '')
+                  queryParams.append('end_date', params.end_date);
             }
 
             const queryString = queryParams.toString();
@@ -42,6 +52,7 @@ const usePurchaseStore = create<PurchaseState>()(
             }
             return response.data;
          },
+
          detail: async ({ id }) => {
             const response = await protectedApi.get(`/purchases/${id}`);
             return response.data;
@@ -116,6 +127,14 @@ const usePurchaseStore = create<PurchaseState>()(
          },
          finish: async ({ id }) => {
             const response = await protectedApi.post(`/purchases/${id}/finish`);
+            return response.data;
+         },
+         receive: async ({ id, data }) => {
+            const response = await protectedApi.post(`/purchases/${id}/receive`, data);
+            return response.data;
+         },
+         getLogs: async ({ id }) => {
+            const response = await protectedApi.get(`/purchases/${id}/receive-logs`);
             return response.data;
          },
          delete: async ({ id }) => {

@@ -37,6 +37,7 @@ export function VerifyView() {
    const { registData, validateOTP, login, setRegist: setRegistData } = useAuthStore(); // ← tambahkan setRegistData
    const router = useRouter();
    const searchParams = useSearchParams();
+   const returnTo = searchParams.get('returnTo') || paths.dashboard.root;
 
    const defaultValues: VerifySchemaType = { code: '' };
 
@@ -76,7 +77,7 @@ export function VerifyView() {
          }
 
          if (fetch?.success) {
-            router.replace(isLogin ? paths.dashboard.root : paths.auth.signUp);
+            router.replace(isLogin ? returnTo : paths.auth.signUp);
          } else {
             toast.error(fetch?.message || 'Verification failed');
          }
@@ -135,7 +136,7 @@ export function VerifyView() {
                }
 
                if (fetch?.success) {
-                  router.replace(purpose === 'login' ? paths.dashboard.root : paths.auth.signUp);
+                  router.replace(purpose === 'login' ? returnTo : paths.auth.signUp);
                } else {
                   toast.error(fetch?.message || 'Verification failed');
                }

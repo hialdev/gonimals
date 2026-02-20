@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
-import { protectedApi } from '../lib/al/axios';
+import { api, protectedApi } from '../lib/al/axios';
 import type { Product } from '../types/product';
 
 export interface ProductData extends Product {}
@@ -61,7 +61,7 @@ const useProductStore = create<ProductState>()(
             const queryString = queryParams.toString();
             const url = queryString ? `/catalog?${queryString}` : '/catalog';
 
-            const response = await protectedApi.get(url);
+            const response = await api.get(url);
             if (response.data.success && response.data.data) {
                set({ products: response.data.data.products || response.data.data });
             }
