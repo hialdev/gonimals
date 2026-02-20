@@ -22,13 +22,14 @@ type PurchaseProductInput struct {
 }
 
 type PurchaseInput struct {
-	PurchaseNumber *string                `json:"purchase_number" validate:"required,max=100"`
-	PurchaseDate   *time.Time             `json:"purchase_date" validate:"required"`
-	Status         *string                `json:"status" validate:"required,oneof=draft completed cancelled"`
-	PrincipleID    *uuid.UUID             `json:"principle_id" validate:"required"`
-	Notes          *string                `json:"notes,omitempty"`
-	Products       []PurchaseProductInput `json:"products" validate:"required,min=1,dive"`
-	Attachments    []string               `json:"attachments,omitempty"`
+	PurchaseNumber      *string                `json:"purchase_number" validate:"required,max=100"`
+	PurchaseDate        *time.Time             `json:"purchase_date" validate:"required"`
+	ExpectedArrivalDate *time.Time             `json:"expected_arrival_date,omitempty"`
+	Status              *string                `json:"status" validate:"required,oneof=draft completed cancelled"`
+	PrincipleID         *uuid.UUID             `json:"principle_id" validate:"required"`
+	Notes               *string                `json:"notes,omitempty"`
+	Products            []PurchaseProductInput `json:"products" validate:"required,min=1,dive"`
+	Attachments         []string               `json:"attachments,omitempty"`
 }
 
 type PurchaseHandler struct {
@@ -37,6 +38,17 @@ type PurchaseHandler struct {
 
 func NewPurchaseHandler(db *gorm.DB) *PurchaseHandler {
 	return &PurchaseHandler{DB: db}
+}
+
+// computeRemainingQty populates the non-stored RemainingQty field for each purchase product.
+func computeRemainingQty(purchase *models.Purchase) {
+	for i := range purchase.PurchaseProducts {
+		pp := &purchase.PurchaseProducts[i]
+		if pp.Qty != nil && pp.ReceivedQty != nil {
+			remaining := *pp.Qty - *pp.ReceivedQty
+			pp.RemainingQty = &remaining
+		}
+	}
 }
 
 func (h *PurchaseHandler) GetPurchase(c *fiber.Ctx) error {
@@ -51,29 +63,56 @@ func (h *PurchaseHandler) GetPurchase(c *fiber.Ctx) error {
 		return utils.RespApi(c, "ise", "Gagal mendapatkan data Purchase", err.Error())
 	}
 
+	computeRemainingQty(&purchase)
 	return utils.RespApi(c, "ok", "Berhasil mendapatkan data Purchase", purchase)
 }
 
 func (h *PurchaseHandler) GetAllPurchases(c *fiber.Ctx) error {
 	page, _ := strconv.Atoi(c.Query("page", "1"))
 	limit, _ := strconv.Atoi(c.Query("limit", "10"))
-	search := strings.ToLower(c.Query("search", ""))
-	sort := c.Query("sort", "id")
+	search := strings.TrimSpace(c.Query("search", ""))
+	sort := c.Query("sort", "created_at")
 	order := c.Query("order", "desc")
 	status := c.Query("status", "")
+	principleIDs := c.Query("principle_ids", "") // comma-separated UUIDs
+	startDate := c.Query("start_date", "")
+	endDate := c.Query("end_date", "")
 
 	offset := (page - 1) * limit
 
 	db := h.DB.Model(&models.Purchase{}).Preload("Principle").Preload("PurchaseProducts.Product")
 
-	// Filter search
+	// Filter: text search on notes
 	if search != "" {
-		db = db.Where("LOWER(purchase_number) LIKE ?", "%"+search+"%")
+		db = db.Where("LOWER(notes) LIKE ?", "%"+strings.ToLower(search)+"%")
 	}
 
-	// Filter by status
+	// Filter: status
 	if status != "" {
 		db = db.Where("status = ?", status)
+	}
+
+	// Filter: supplier (multiple principle_ids, comma-separated)
+	if principleIDs != "" {
+		ids := strings.Split(principleIDs, ",")
+		cleaned := []string{}
+		for _, id := range ids {
+			id = strings.TrimSpace(id)
+			if id != "" {
+				cleaned = append(cleaned, id)
+			}
+		}
+		if len(cleaned) > 0 {
+			db = db.Where("principle_id IN ?", cleaned)
+		}
+	}
+
+	// Filter: date range on purchase_date
+	if startDate != "" {
+		db = db.Where("purchase_date >= ?", startDate)
+	}
+	if endDate != "" {
+		db = db.Where("purchase_date <= ?", endDate+" 23:59:59")
 	}
 
 	// Count total
@@ -136,6 +175,16 @@ func (h *PurchaseHandler) AddPurchase(c *fiber.Ctx) error {
 			return utils.RespApi(c, "bad", "Format tanggal tidak valid", err.Error())
 		}
 
+		// Parse expected arrival date
+		expectedArrivalDateStr := c.FormValue("expected_arrival_date")
+		var expectedArrivalDate *time.Time
+		if expectedArrivalDateStr != "" {
+			t, err := time.Parse("2006-01-02", expectedArrivalDateStr)
+			if err == nil {
+				expectedArrivalDate = &t
+			}
+		}
+
 		// Parse principle ID
 		principleID, err := uuid.Parse(principleIDStr)
 		if err != nil {
@@ -149,12 +198,13 @@ func (h *PurchaseHandler) AddPurchase(c *fiber.Ctx) error {
 		}
 
 		input = PurchaseInput{
-			PurchaseNumber: &purchaseNumber,
-			PurchaseDate:   &purchaseDate,
-			Status:         &status,
-			PrincipleID:    &principleID,
-			Notes:          &notes,
-			Products:       products,
+			PurchaseNumber:      &purchaseNumber,
+			PurchaseDate:        &purchaseDate,
+			ExpectedArrivalDate: expectedArrivalDate,
+			Status:              &status,
+			PrincipleID:         &principleID,
+			Notes:               &notes,
+			Products:            products,
 		}
 
 		// Handle file uploads for attachments
@@ -211,14 +261,15 @@ func (h *PurchaseHandler) AddPurchase(c *fiber.Ctx) error {
 	// Create purchase with is_clear = false by default
 	isClear := false
 	purchase := models.Purchase{
-		PurchaseNumber: input.PurchaseNumber,
-		PurchaseDate:   input.PurchaseDate,
-		Status:         input.Status,
-		IsClear:        &isClear,
-		PrincipleID:    input.PrincipleID,
-		TotalPrice:     &totalPrice,
-		Notes:          input.Notes,
-		Attachments:    attachmentsJSON,
+		PurchaseNumber:      input.PurchaseNumber,
+		PurchaseDate:        input.PurchaseDate,
+		ExpectedArrivalDate: input.ExpectedArrivalDate,
+		Status:              input.Status,
+		IsClear:             &isClear,
+		PrincipleID:         input.PrincipleID,
+		TotalPrice:          &totalPrice,
+		Notes:               input.Notes,
+		Attachments:         attachmentsJSON,
 	}
 
 	if err := tx.Create(&purchase).Error; err != nil {
@@ -226,14 +277,16 @@ func (h *PurchaseHandler) AddPurchase(c *fiber.Ctx) error {
 		return utils.RespApi(c, "ise", "Tidak dapat membuat Purchase", err.Error())
 	}
 
-	// Create purchase products (no stock movement until finish)
+	// Create purchase products (no stock movement until finish/receive)
 	for _, productInput := range input.Products {
 		subtotal := float64(*productInput.Qty) * *productInput.PurchasePrice
+		receivedQty := 0
 
 		purchaseProduct := models.PurchaseProduct{
 			PurchaseID:    &purchase.ID,
 			ProductID:     productInput.ProductID,
 			Qty:           productInput.Qty,
+			ReceivedQty:   &receivedQty,
 			PurchasePrice: productInput.PurchasePrice,
 			Subtotal:      &subtotal,
 		}
@@ -251,7 +304,7 @@ func (h *PurchaseHandler) AddPurchase(c *fiber.Ctx) error {
 
 	// Load relations
 	h.DB.Preload("Principle").Preload("PurchaseProducts.Product").First(&purchase, "id = ?", purchase.ID)
-
+	computeRemainingQty(&purchase)
 	return utils.RespApi(c, "ok", "Berhasil membuat data Purchase", purchase)
 }
 
@@ -291,6 +344,16 @@ func (h *PurchaseHandler) UpdatePurchase(c *fiber.Ctx) error {
 			return utils.RespApi(c, "bad", "Format tanggal tidak valid", err.Error())
 		}
 
+		// Parse expected arrival date
+		expectedArrivalDateStr := c.FormValue("expected_arrival_date")
+		var expectedArrivalDate *time.Time
+		if expectedArrivalDateStr != "" {
+			t, err := time.Parse("2006-01-02", expectedArrivalDateStr)
+			if err == nil {
+				expectedArrivalDate = &t
+			}
+		}
+
 		// Parse principle ID
 		principleID, err := uuid.Parse(principleIDStr)
 		if err != nil {
@@ -304,12 +367,13 @@ func (h *PurchaseHandler) UpdatePurchase(c *fiber.Ctx) error {
 		}
 
 		input = PurchaseInput{
-			PurchaseNumber: &purchaseNumber,
-			PurchaseDate:   &purchaseDate,
-			Status:         &status,
-			PrincipleID:    &principleID,
-			Notes:          &notes,
-			Products:       products,
+			PurchaseNumber:      &purchaseNumber,
+			PurchaseDate:        &purchaseDate,
+			ExpectedArrivalDate: expectedArrivalDate,
+			Status:              &status,
+			PrincipleID:         &principleID,
+			Notes:               &notes,
+			Products:            products,
 		}
 
 		// Handle file uploads for attachments
@@ -372,6 +436,7 @@ func (h *PurchaseHandler) UpdatePurchase(c *fiber.Ctx) error {
 	// Update purchase
 	existingPurchase.PurchaseNumber = input.PurchaseNumber
 	existingPurchase.PurchaseDate = input.PurchaseDate
+	existingPurchase.ExpectedArrivalDate = input.ExpectedArrivalDate
 	existingPurchase.Status = input.Status
 	existingPurchase.PrincipleID = input.PrincipleID
 	existingPurchase.Notes = input.Notes
@@ -388,11 +453,13 @@ func (h *PurchaseHandler) UpdatePurchase(c *fiber.Ctx) error {
 	// Create new purchase products
 	for _, productInput := range input.Products {
 		subtotal := float64(*productInput.Qty) * *productInput.PurchasePrice
+		receivedQty := 0
 
 		purchaseProduct := models.PurchaseProduct{
 			PurchaseID:    &existingPurchase.ID,
 			ProductID:     productInput.ProductID,
 			Qty:           productInput.Qty,
+			ReceivedQty:   &receivedQty,
 			PurchasePrice: productInput.PurchasePrice,
 			Subtotal:      &subtotal,
 		}
@@ -412,6 +479,222 @@ func (h *PurchaseHandler) UpdatePurchase(c *fiber.Ctx) error {
 	h.DB.Preload("Principle").Preload("PurchaseProducts.Product").First(&existingPurchase, "id = ?", existingPurchase.ID)
 
 	return utils.RespApi(c, "ok", "Berhasil update data Purchase", existingPurchase)
+}
+
+type ReceivePurchaseInput struct {
+	ReceivedDate *time.Time `json:"received_date" validate:"required"`
+	Products     []struct {
+		ProductID   *uuid.UUID `json:"product_id" validate:"required"`
+		ReceivedQty *int       `json:"received_qty" validate:"required,min=0"`
+	} `json:"products" validate:"required,min=1,dive"`
+}
+
+func (h *PurchaseHandler) GetReceiveLogs(c *fiber.Ctx) error {
+	idParam := c.Params("id")
+	id, err := uuid.Parse(idParam)
+	if err != nil {
+		return utils.RespApi(c, "bad", "ID yang diberikan tidak valid", nil)
+	}
+
+	var logs []models.PurchaseReceiveLog
+	if err := h.DB.
+		Preload("Items.Product").
+		Where("purchase_id = ?", id).
+		Order("received_date DESC, created_at DESC").
+		Find(&logs).Error; err != nil {
+		return utils.RespApi(c, "ise", "Gagal mengambil receive logs", err.Error())
+	}
+
+	return utils.RespApi(c, "ok", "Berhasil mendapatkan receive logs", logs)
+}
+
+type ReceiveItemInput struct {
+	ProductID  *uuid.UUID `json:"product_id" validate:"required"`
+	QtyReceive *int       `json:"qty_to_receive" validate:"required,min=1"`
+}
+
+type ReceivePurchaseInputV2 struct {
+	ReceivedDate *time.Time         `json:"received_date" validate:"required"`
+	Products     []ReceiveItemInput `json:"products" validate:"required,min=1,dive"`
+}
+
+func (h *PurchaseHandler) ReceivePurchase(c *fiber.Ctx) error {
+	idParam := c.Params("id")
+	id, err := uuid.Parse(idParam)
+	if err != nil {
+		return utils.RespApi(c, "bad", "ID yang diberikan tidak valid", nil)
+	}
+
+	// Validate input
+	var input ReceivePurchaseInputV2
+	if err := c.BodyParser(&input); err != nil {
+		return utils.RespApi(c, "bad", "Request Body tidak valid", err.Error())
+	}
+
+	if err := utils.Validate.Struct(input); err != nil {
+		if verrs, ok := err.(validator.ValidationErrors); ok {
+			return utils.RespApi(c, "bad", "Validasi gagal", verrs.Translate(utils.Translator))
+		}
+		return utils.RespApi(c, "bad", "Validasi gagal", err.Error())
+	}
+
+	// Get existing purchase with its products
+	var purchase models.Purchase
+	if err := h.DB.Preload("PurchaseProducts").First(&purchase, "id = ?", id).Error; err != nil {
+		return utils.RespApi(c, "ise", "Gagal mendapatkan data Purchase", err.Error())
+	}
+
+	if purchase.IsClear != nil && *purchase.IsClear {
+		return utils.RespApi(c, "bad", "Purchase sudah di-finish dan tidak dapat menerima barang lagi", nil)
+	}
+
+	tx := h.DB.Begin()
+	defer func() {
+		if r := recover(); r != nil {
+			tx.Rollback()
+		}
+	}()
+
+	allFullyReceived := true
+	logItems := []models.PurchaseReceiveLogItem{}
+
+	for _, reqProduct := range input.Products {
+		// Validate product exists in this purchase and get orderedQty
+		var orderedQty int
+		found := false
+		for i := range purchase.PurchaseProducts {
+			if purchase.PurchaseProducts[i].ProductID.String() == reqProduct.ProductID.String() {
+				orderedQty = *purchase.PurchaseProducts[i].Qty
+				found = true
+				break
+			}
+		}
+
+		if !found {
+			tx.Rollback()
+			return utils.RespApi(c, "bad", fmt.Sprintf("Produk dengan ID %s tidak ada dalam Purchase ini", reqProduct.ProductID), nil)
+		}
+
+		// Re-read received_qty from DB inside the transaction with row lock.
+		// Use purchase_id + product_id (always available) instead of the internal PK
+		// to avoid any UUID pointer marshaling issues with BaseModel.
+		var currentReceivedQty int
+		row := tx.Raw(
+			"SELECT received_qty FROM purchase_products WHERE purchase_id = ? AND product_id = ? FOR UPDATE",
+			purchase.ID, reqProduct.ProductID,
+		).Row()
+		if err := row.Scan(&currentReceivedQty); err != nil {
+			tx.Rollback()
+			return utils.RespApi(c, "ise", "Gagal membaca received_qty terkini", err.Error())
+		}
+
+		qtyToReceive := *reqProduct.QtyReceive
+		remaining := orderedQty - currentReceivedQty
+
+		if qtyToReceive <= 0 {
+			tx.Rollback()
+			return utils.RespApi(c, "bad", "Qty yang diterima harus lebih dari 0", nil)
+		}
+
+		if qtyToReceive > remaining {
+			tx.Rollback()
+			return utils.RespApi(c, "bad", fmt.Sprintf("Qty yang diterima (%d) melebihi sisa yang belum diterima (%d)", qtyToReceive, remaining), nil)
+		}
+
+		newReceived := currentReceivedQty + qtyToReceive
+
+		// Update product stock
+		if res := tx.Exec("UPDATE products SET stock = COALESCE(stock, 0) + ?, updated_at = NOW() WHERE id = ?", qtyToReceive, reqProduct.ProductID); res.Error != nil {
+			tx.Rollback()
+			return utils.RespApi(c, "ise", "Gagal update stock product", res.Error.Error())
+		}
+
+		// Create stock movement
+		referenceType := "purchase"
+		description := fmt.Sprintf("Purchase %s (Partial Receive)", *purchase.PurchaseNumber)
+		stockMovement := models.StockMovement{
+			ProductID:     reqProduct.ProductID,
+			ReferenceType: &referenceType,
+			ReferenceID:   &purchase.ID,
+			Qty:           &qtyToReceive,
+			Description:   &description,
+		}
+		if err := tx.Create(&stockMovement).Error; err != nil {
+			tx.Rollback()
+			return utils.RespApi(c, "ise", "Gagal membuat stock movement", err.Error())
+		}
+
+		// Update received_qty using purchase_id + product_id (no internal PK needed)
+		if res := tx.Exec(
+			"UPDATE purchase_products SET received_qty = ?, updated_at = NOW() WHERE purchase_id = ? AND product_id = ?",
+			newReceived, purchase.ID, reqProduct.ProductID,
+		); res.Error != nil {
+			tx.Rollback()
+			return utils.RespApi(c, "ise", "Gagal update received quantity pada item", res.Error.Error())
+		}
+
+		// Collect log item
+		logItems = append(logItems, models.PurchaseReceiveLogItem{
+			ProductID:   reqProduct.ProductID,
+			ReceivedQty: &qtyToReceive,
+		})
+
+		if newReceived < orderedQty {
+			allFullyReceived = false
+		}
+	}
+
+	// Create receive log entry
+	receiveLog := models.PurchaseReceiveLog{
+		PurchaseID:   &purchase.ID,
+		ReceivedDate: input.ReceivedDate,
+	}
+	if err := tx.Create(&receiveLog).Error; err != nil {
+		tx.Rollback()
+		return utils.RespApi(c, "ise", "Gagal membuat receive log", err.Error())
+	}
+
+	// Create log items linked to the log
+	for i := range logItems {
+		logItems[i].ReceiveLogID = &receiveLog.ID
+		if err := tx.Create(&logItems[i]).Error; err != nil {
+			tx.Rollback()
+			return utils.RespApi(c, "ise", "Gagal membuat receive log item", err.Error())
+		}
+	}
+
+	// Update Purchase status and received_date
+	updates := map[string]interface{}{
+		"received_date": input.ReceivedDate,
+	}
+	if allFullyReceived {
+		updates["is_clear"] = true
+		updates["status"] = "completed"
+	} else {
+		updates["status"] = "partial"
+	}
+
+	// IMPORTANT: Use a fresh empty struct + WHERE clause.
+	// DO NOT pass the preloaded &purchase struct — GORM would cascade-create
+	// all preloaded associations (PurchaseProducts), producing duplicate rows.
+	if err := tx.Model(&models.Purchase{}).Where("id = ?", purchase.ID).Updates(updates).Error; err != nil {
+		tx.Rollback()
+		return utils.RespApi(c, "ise", "Gagal update status Purchase", err.Error())
+	}
+
+	if err := tx.Commit().Error; err != nil {
+		return utils.RespApi(c, "ise", "Gagal menyimpan data", err.Error())
+	}
+
+	h.DB.Preload("Principle").Preload("PurchaseProducts.Product").First(&purchase, "id = ?", purchase.ID)
+	computeRemainingQty(&purchase)
+
+	message := "Berhasil menerima barang Purchase sebagian"
+	if allFullyReceived {
+		message = "Semua barang Purchase diterima, status selesai"
+	}
+
+	return utils.RespApi(c, "ok", message, purchase)
 }
 
 func (h *PurchaseHandler) FinishPurchase(c *fiber.Ctx) error {

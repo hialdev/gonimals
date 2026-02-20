@@ -70,10 +70,14 @@ func (h *MyOrderHandler) GetUserIDFromToken(c *fiber.Ctx) (string, error) {
 // GetMyOrders - Fetch orders strictly for the logged-in user
 func (h *MyOrderHandler) GetMyOrders(c *fiber.Ctx) error {
 	// Get user ID from JWT middleware context
-	userID, err := h.GetUserIDFromToken(c)
-
+	userIDStr, err := h.GetUserIDFromToken(c)
 	if err != nil {
 		return utils.RespApi(c, "unauth", "User ID not found in token", nil)
+	}
+
+	userID, err := uuid.Parse(userIDStr)
+	if err != nil {
+		return utils.RespApi(c, "bad", "User ID tidak valid", err.Error())
 	}
 
 	page, _ := strconv.Atoi(c.Query("page", "1"))
@@ -122,6 +126,21 @@ func (h *MyOrderHandler) GetMyOrders(c *fiber.Ctx) error {
 	var orders []models.Order
 	if err := db.Offset(offset).Limit(limit).Find(&orders).Error; err != nil {
 		return utils.RespApi(c, "ise", "Gagal ambil data", err.Error())
+	}
+
+	for i, order := range orders {
+		for j, op := range order.OrderProducts {
+			var reviewCount int64
+			h.DB.Model(&models.ProductReview{}).
+				Where("order_id = ? AND product_id = ? AND user_id = ?", op.OrderID, op.ProductID, userID).
+				Count(&reviewCount)
+
+			if reviewCount > 0 {
+				orders[i].OrderProducts[j].HasReview = true
+			} else {
+				orders[i].OrderProducts[j].HasReview = false
+			}
+		}
 	}
 
 	totalPages := (total + int64(limit) - 1) / int64(limit)
@@ -279,9 +298,14 @@ func (h *MyOrderHandler) CreateMyOrder(c *fiber.Ctx) error {
 // GetMyOrderDetail - Fetch a specific order strictly for the logged-in user
 func (h *MyOrderHandler) GetMyOrderDetail(c *fiber.Ctx) error {
 	// Get user ID from JWT middleware context
-	userID, err := h.GetUserIDFromToken(c)
+	userIDStr, err := h.GetUserIDFromToken(c)
 	if err != nil {
 		return utils.RespApi(c, "unauth", "User ID not found in token", nil)
+	}
+
+	userID, err := uuid.Parse(userIDStr)
+	if err != nil {
+		return utils.RespApi(c, "bad", "User ID tidak valid", err.Error())
 	}
 
 	orderID := c.Params("id")
@@ -295,6 +319,20 @@ func (h *MyOrderHandler) GetMyOrderDetail(c *fiber.Ctx) error {
 			return utils.RespApi(c, "nf", "Pesanan tidak ditemukan", nil)
 		}
 		return utils.RespApi(c, "ise", "Gagal mengambil data pesanan", err.Error())
+	}
+
+	// Populate HasReview flag
+	for i, op := range order.OrderProducts {
+		var reviewCount int64
+		h.DB.Model(&models.ProductReview{}).
+			Where("order_id = ? AND product_id = ? AND user_id = ?", op.OrderID, op.ProductID, userID).
+			Count(&reviewCount)
+
+		if reviewCount > 0 {
+			order.OrderProducts[i].HasReview = true
+		} else {
+			order.OrderProducts[i].HasReview = false
+		}
 	}
 
 	return utils.RespApi(c, "ok", "Berhasil mendapatkan detail pesanan", order)

@@ -890,3 +890,192 @@ func (h *OrderHandler) AdminFinish(c *fiber.Ctx) error {
 
 	return utils.RespApi(c, "ok", "Order marked as finished", nil)
 }
+
+// UploadTransferProof - Customer uploads proof of bank transfer
+func (h *OrderHandler) UploadTransferProof(c *fiber.Ctx) error {
+	idStr := c.Params("id")
+	id, err := uuid.Parse(idStr)
+	if err != nil {
+		return utils.RespApi(c, "bad", "Invalid order ID", nil)
+	}
+
+	var order models.Order
+	if err := h.DB.First(&order, "id = ?", id).Error; err != nil {
+		return utils.RespApi(c, "nf", "Order tidak ditemukan", err.Error())
+	}
+
+	if order.Status == nil || (*order.Status != "waiting_payment" && *order.Status != "waiting_confirmation") {
+		return utils.RespApi(c, "bad", "Order tidak dalam status yang bisa upload bukti transfer", nil)
+	}
+
+	bankIDStr := c.FormValue("bank_id")
+	if bankIDStr == "" {
+		return utils.RespApi(c, "bad", "bank_id wajib diisi", nil)
+	}
+	bankID, err := uuid.Parse(bankIDStr)
+	if err != nil {
+		return utils.RespApi(c, "bad", "bank_id tidak valid", nil)
+	}
+
+	// Verify bank exists and is active
+	var bank models.Bank
+	if err := h.DB.First(&bank, "id = ? AND is_active = true", bankID).Error; err != nil {
+		return utils.RespApi(c, "bad", "Bank tidak ditemukan atau tidak aktif", nil)
+	}
+
+	// Upload proof file
+	proofPath, err := utils.UploadFile(c, "transfer_proof", "transfer_proofs")
+	if err != nil {
+		return utils.RespApi(c, "bad", "Gagal upload bukti transfer: "+err.Error(), nil)
+	}
+
+	newStatus := "waiting_confirmation"
+	if err := h.DB.Model(&models.Order{}).Where("id = ?", id).Updates(map[string]interface{}{
+		"bank_id":        bankID,
+		"transfer_proof": proofPath,
+		"status":         newStatus,
+	}).Error; err != nil {
+		return utils.RespApi(c, "ise", "Gagal menyimpan bukti transfer", err.Error())
+	}
+
+	if err := CreateOrderLog(h.DB, id, newStatus, "Customer mengupload bukti transfer", []string{proofPath}, nil); err != nil {
+		fmt.Printf("Failed to create order log: %v\n", err)
+	}
+
+	h.DB.Preload("Bank").First(&order, "id = ?", id)
+	return utils.RespApi(c, "ok", "Bukti transfer berhasil dikirim, menunggu konfirmasi admin", order)
+}
+
+// ConfirmPayment - Admin confirms manual transfer payment
+func (h *OrderHandler) ConfirmPayment(c *fiber.Ctx) error {
+	idStr := c.Params("id")
+	id, err := uuid.Parse(idStr)
+	if err != nil {
+		return utils.RespApi(c, "bad", "Invalid order ID", nil)
+	}
+
+	var order models.Order
+	if err := h.DB.First(&order, "id = ?", id).Error; err != nil {
+		return utils.RespApi(c, "nf", "Order tidak ditemukan", err.Error())
+	}
+
+	if order.Status == nil || *order.Status != "waiting_confirmation" {
+		return utils.RespApi(c, "bad", "Order tidak dalam status waiting_confirmation", nil)
+	}
+
+	// Get admin ID
+	var adminID *uuid.UUID
+	if userID := c.Locals("user_id"); userID != nil {
+		if uid, ok := userID.(uuid.UUID); ok {
+			adminID = &uid
+		}
+	}
+
+	tx := h.DB.Begin()
+	defer func() {
+		if r := recover(); r != nil {
+			tx.Rollback()
+		}
+	}()
+
+	// Update order status to on_progress
+	newStatus := "on_progress"
+	if err := tx.Model(&models.Order{}).Where("id = ?", id).Update("status", newStatus).Error; err != nil {
+		tx.Rollback()
+		return utils.RespApi(c, "ise", "Gagal update status order", err.Error())
+	}
+
+	// Deduct stock for each order product
+	var orderProducts []models.OrderProduct
+	if err := tx.Where("order_id = ?", id).Find(&orderProducts).Error; err != nil {
+		tx.Rollback()
+		return utils.RespApi(c, "ise", "Gagal ambil order products", err.Error())
+	}
+
+	for _, op := range orderProducts {
+		result := tx.Model(&models.Product{}).
+			Where("id = ? AND stock >= ?", op.ProductID, *op.Qty).
+			UpdateColumn("stock", gorm.Expr("stock - ?", *op.Qty))
+
+		if result.Error != nil || result.RowsAffected == 0 {
+			tx.Rollback()
+			return utils.RespApi(c, "bad", "Stock tidak mencukupi untuk salah satu produk", nil)
+		}
+
+		referenceType := "order"
+		description := fmt.Sprintf("Order %s (manual transfer confirmed)", *order.OrderNumber)
+		qtyNegative := -*op.Qty
+		stockMovement := models.StockMovement{
+			ProductID:     op.ProductID,
+			ReferenceType: &referenceType,
+			ReferenceID:   &order.ID,
+			Qty:           &qtyNegative,
+			Description:   &description,
+		}
+		if err := tx.Create(&stockMovement).Error; err != nil {
+			tx.Rollback()
+			return utils.RespApi(c, "ise", "Gagal buat stock movement", err.Error())
+		}
+	}
+
+	if err := tx.Commit().Error; err != nil {
+		return utils.RespApi(c, "ise", "Gagal commit transaksi", err.Error())
+	}
+
+	if err := CreateOrderLog(h.DB, id, newStatus, "Admin mengkonfirmasi pembayaran transfer manual", nil, adminID); err != nil {
+		fmt.Printf("Failed to create order log: %v\n", err)
+	}
+
+	return utils.RespApi(c, "ok", "Pembayaran dikonfirmasi, order diproses", nil)
+}
+
+// RejectPayment - Admin rejects manual transfer, customer must re-upload
+func (h *OrderHandler) RejectPayment(c *fiber.Ctx) error {
+	idStr := c.Params("id")
+	id, err := uuid.Parse(idStr)
+	if err != nil {
+		return utils.RespApi(c, "bad", "Invalid order ID", nil)
+	}
+
+	var order models.Order
+	if err := h.DB.First(&order, "id = ?", id).Error; err != nil {
+		return utils.RespApi(c, "nf", "Order tidak ditemukan", err.Error())
+	}
+
+	if order.Status == nil || *order.Status != "waiting_confirmation" {
+		return utils.RespApi(c, "bad", "Order tidak dalam status waiting_confirmation", nil)
+	}
+
+	reason := c.FormValue("reason")
+	if reason == "" {
+		reason = "Bukti transfer tidak valid, silakan upload ulang"
+	}
+
+	var adminID *uuid.UUID
+	if userID := c.Locals("user_id"); userID != nil {
+		if uid, ok := userID.(uuid.UUID); ok {
+			adminID = &uid
+		}
+	}
+
+	// Save the rejected proof in the log timeline before clearing it
+	var rejectedProofImages []string
+	if order.TransferProof != nil && *order.TransferProof != "" {
+		rejectedProofImages = []string{*order.TransferProof}
+	}
+
+	// Reset to waiting_payment, clear proof
+	if err := h.DB.Model(&models.Order{}).Where("id = ?", id).Updates(map[string]interface{}{
+		"status":         "waiting_payment",
+		"transfer_proof": nil,
+		"bank_id":        nil,
+	}).Error; err != nil {
+		return utils.RespApi(c, "ise", "Gagal reset status order", err.Error())
+	}
+
+	if err := CreateOrderLog(h.DB, id, "waiting_payment", "Admin menolak bukti transfer: "+reason, rejectedProofImages, adminID); err != nil {
+		fmt.Printf("Failed to create order log: %v\n", err)
+	}
+
+	return utils.RespApi(c, "ok", "Pembayaran ditolak, customer perlu upload ulang", nil)
+}

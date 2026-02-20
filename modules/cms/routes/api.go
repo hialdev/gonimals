@@ -70,6 +70,16 @@ func SetupCMSRoutes(app *fiber.App, db *gorm.DB) {
 	principle.Use(middlewares.DoACL("Update Principle")).Post("/:id", principles.UpdatePrinciple)
 	principle.Use(middlewares.DoACL("Delete Principle")).Delete("/:id", principles.DeletePrinciple)
 
+	// Bank routes
+	banks := handlers.NewBankHandler(db)
+	bank := api.Group("/banks")
+	bank.Get("/", banks.GetAllBanks) // public: customers need to see banks
+	bank.Get("/:id", banks.GetBank)  // public
+	bank.Use(middlewares.JWTProtected())
+	bank.Use(middlewares.DoACL("Add Principle")).Post("/", banks.AddBank)
+	bank.Use(middlewares.DoACL("Update Principle")).Post("/:id", banks.UpdateBank)
+	bank.Use(middlewares.DoACL("Delete Principle")).Delete("/:id", banks.DeleteBank)
+
 	// Purchase routes
 	purchases := handlers.NewPurchaseHandler(db)
 	purchase := api.Group("/purchases")
@@ -79,6 +89,8 @@ func SetupCMSRoutes(app *fiber.App, db *gorm.DB) {
 	purchase.Use(middlewares.DoACL("Add Purchase")).Post("/", purchases.AddPurchase)
 	purchase.Use(middlewares.DoACL("Update Purchase")).Post("/:id", purchases.UpdatePurchase)
 	purchase.Use(middlewares.DoACL("Update Purchase")).Post("/:id/finish", purchases.FinishPurchase)
+	purchase.Use(middlewares.DoACL("Update Purchase")).Post("/:id/receive", purchases.ReceivePurchase)
+	purchase.Use(middlewares.DoACL("Read Purchase")).Get("/:id/receive-logs", purchases.GetReceiveLogs)
 	purchase.Use(middlewares.DoACL("Delete Purchase")).Delete("/:id", purchases.DeletePurchase)
 
 	// Order routes
@@ -87,16 +99,22 @@ func SetupCMSRoutes(app *fiber.App, db *gorm.DB) {
 	api.Get("/catalog", catalog.GetCatalogProducts)
 	api.Get("/catalog/stock/:id", catalog.GetProductStock)
 
+	reviews := handlers.NewProductReviewHandler(db)
+	api.Get("/catalog/reviews/:productId", reviews.GetProductReviews)
+
 	// Protected User Actions (require valid JWT)
 	myOrder := handlers.NewMyOrderHandler(db)
-	userRoutes := api.Group("/user") // Group for user-centric routes
+	orders := handlers.NewOrderHandler(db) // declared here so userRoutes can reference it
+	userRoutes := api.Group("/user")       // Group for user-centric routes
 	userRoutes.Use(middlewares.JWTProtected())
 	userRoutes.Get("/my-orders", myOrder.GetMyOrders)
 	userRoutes.Get("/my-orders/:id", myOrder.GetMyOrderDetail)
 	userRoutes.Post("/checkout", myOrder.CreateMyOrder)
+	userRoutes.Post("/my-orders/:id/upload-transfer", orders.UploadTransferProof)
+	userRoutes.Post("/reviews", reviews.AddProductReview)
 
-	orders := handlers.NewOrderHandler(db)
 	od := api.Group("/orders")
+
 	od.Use(middlewares.JWTProtected())
 	od.Use(middlewares.DoACL("Read Order")).Get("/", orders.GetAllOrders)
 	od.Use(middlewares.DoACL("Read Order")).Get("/:id", orders.GetOrder)
@@ -111,6 +129,8 @@ func SetupCMSRoutes(app *fiber.App, db *gorm.DB) {
 	od.Use(middlewares.DoACL("Cancel Order")).Post("/:id/admin-cancel", orders.AdminCancel)
 	od.Use(middlewares.DoACL("Update Order")).Post("/:id/admin-confirm-restock", orders.AdminConfirmRestock)
 	od.Use(middlewares.DoACL("Update Order")).Post("/:id/admin-finish", orders.AdminFinish)
+	od.Use(middlewares.DoACL("Update Order")).Post("/:id/confirm-payment", orders.ConfirmPayment)
+	od.Use(middlewares.DoACL("Update Order")).Post("/:id/reject-payment", orders.RejectPayment)
 
 	// Order Log Status routes
 	orderLogStatus := handlers.NewOrderLogStatusHandler(db)
@@ -138,6 +158,13 @@ func SetupCMSRoutes(app *fiber.App, db *gorm.DB) {
 	stockMovement.Use(middlewares.JWTProtected())
 	stockMovement.Use(middlewares.DoACL("Read StockMovement")).Get("/", stockMovements.GetAllStockMovements)
 	stockMovement.Use(middlewares.DoACL("Read StockMovement")).Get("/:id", stockMovements.GetStockMovement)
+
+	// Admin Review routes
+	adminReview := api.Group("/reviews")
+	adminReview.Use(middlewares.JWTProtected())
+	adminReview.Get("/", reviews.GetAllReviews)
+	adminReview.Patch("/:id/toggle-visibility", reviews.ToggleReviewVisibility)
+	adminReview.Delete("/:id", reviews.DeleteReview)
 
 	// Dashboard routes
 	dashboards := handlers.NewDashboardHandler(db)

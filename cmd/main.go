@@ -67,13 +67,17 @@ func main() {
 		&CMSModels.ProductType{},
 		&CMSModels.Product{},
 		&CMSModels.Principle{},
+		&CMSModels.Bank{},
 		&CMSModels.Purchase{},
 		&CMSModels.PurchaseProduct{},
+		&CMSModels.PurchaseReceiveLog{},
+		&CMSModels.PurchaseReceiveLogItem{},
 		&CMSModels.Order{},
 		&CMSModels.OrderProduct{},
 		&CMSModels.OrderLogStatus{},
 		&CMSModels.Adjustment{},
 		&CMSModels.StockMovement{},
+		&CMSModels.ProductReview{},
 	)
 
 	routes.InitRoutes(app, connection.DB)

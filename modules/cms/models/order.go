@@ -19,6 +19,9 @@ type Order struct {
 	TotalBill        *float64         `json:"total_bill" gorm:"type:decimal(15,2);not null"`
 	XenditInvoiceID  *string          `json:"xendit_invoice_id,omitempty" gorm:"type:varchar(200)"`
 	XenditInvoiceURL *string          `json:"xendit_invoice_url,omitempty" gorm:"type:text"`
+	BankID           *uuid.UUID       `json:"bank_id,omitempty" gorm:"type:uuid"`
+	Bank             *Bank            `json:"bank,omitempty" gorm:"foreignKey:BankID"`
+	TransferProof    *string          `json:"transfer_proof,omitempty" gorm:"type:text"`
 	OrderProducts    []OrderProduct   `json:"order_products,omitempty" gorm:"foreignKey:OrderID"`
 	OrderLogs        []OrderLogStatus `json:"order_logs,omitempty" gorm:"foreignKey:OrderID"`
 }
@@ -30,4 +33,5 @@ type OrderProduct struct {
 	Product      *Product   `json:"product,omitempty" gorm:"foreignKey:ProductID"`
 	PriceAtOrder *float64   `json:"price_at_order" gorm:"type:decimal(15,2);not null"`
 	Qty          *int       `json:"qty" gorm:"not null"`
+	HasReview    bool       `json:"has_review" gorm:"-"`
 }
