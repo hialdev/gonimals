@@ -14,11 +14,14 @@ import TableBody from '@mui/material/TableBody';
 import { paths } from 'src/routes/al/paths';
 import useStockMovementStore from 'src/stores/stock-movement';
 import { DashboardContent } from 'src/layouts/dashboard';
+import { exportToExcel, exportToCSV } from 'src/utils/export-data';
+import dayjs from 'dayjs';
 
 import { toast } from 'src/components/snackbar';
 import { Scrollbar } from 'src/components/scrollbar';
 import { LoadingScreen } from 'src/components/loading-screen';
 import { CustomBreadcrumbs } from 'src/components/custom-breadcrumbs';
+import { ExportButton } from 'src/components/export-button';
 import {
    useTable,
    TableNoData,
@@ -95,6 +98,52 @@ export function StockMovementListView() {
       setLoading(false);
    };
 
+   const handleExport = async (format: 'excel' | 'csv') => {
+      try {
+         const params: any = {
+            page: 1,
+            limit: 10000,
+            sort: table.orderBy,
+            order: table.order,
+         };
+
+         if (currentFilters.search) params.search = currentFilters.search;
+         if (currentFilters.product_id) params.product_id = currentFilters.product_id;
+         if (currentFilters.reference_type) params.reference_type = currentFilters.reference_type;
+
+         const res = await all(params);
+
+         if (res.success) {
+            const stockMovements = res.data.stock_movements || [];
+            if (stockMovements.length === 0) {
+               toast.error('No data to export');
+               return;
+            }
+
+            const flatData = stockMovements.map((item: any) => ({
+               'Date & Time': item.created_at ? dayjs(item.created_at).format('DD MMM YYYY HH:mm') : '-',
+               'Product Title': item.product?.title || '-',
+               'Product SKU': item.product?.sku || '-',
+               'Type': item.reference_type || '-',
+               'Quantity': item.qty || 0,
+               'Description': item.description || '-',
+               'Reference ID': item.reference_id || '-',
+            }));
+
+            if (format === 'excel') {
+               exportToExcel(flatData, 'StockMovements_Data');
+            } else {
+               exportToCSV(flatData, 'StockMovements_Data');
+            }
+         } else {
+            toast.error('Failed to load data for export');
+         }
+      } catch (error) {
+         toast.error('Export failed');
+         console.error(error);
+      }
+   };
+
    useEffect(() => {
       fetchData();
    }, [
@@ -118,6 +167,7 @@ export function StockMovementListView() {
                { name: 'Stock Movements', href: paths.dashboard.stock_movements.root },
                { name: 'List' },
             ]}
+            action={<ExportButton onExport={handleExport} />}
             sx={{ mb: { xs: 3, md: 5 } }}
          />
 

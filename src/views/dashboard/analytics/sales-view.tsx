@@ -27,6 +27,7 @@ import { CustomBreadcrumbs } from 'src/components/custom-breadcrumbs';
 import { LoadingScreen } from 'src/components/loading-screen';
 import { Chart, useChart } from 'src/components/chart';
 import { Label } from 'src/components/label';
+import { ExportButton } from 'src/components/export-button';
 
 import useDashboardStore from 'src/stores/dashboard';
 import { AnalyticsWidgetSummary } from './components/widget-summary';
@@ -99,6 +100,20 @@ export function SalesAnalyticsView() {
                { name: 'Analytics', href: paths.dashboard.analytics.sales },
                { name: 'Sales' },
             ]}
+            action={
+               <ExportButton
+                  filename="Sales_Analytics_Data"
+                  data={
+                     salesData?.recent_orders?.map((order: any) => ({
+                        'Order ID': order.code || order.id.substring(0, 8),
+                        Date: fDateTime(order.created_at),
+                        Customer: order.user?.name || '@' + order.user?.username || '-',
+                        Total: order.total_bill,
+                        Status: order.status,
+                     })) || []
+                  }
+               />
+            }
             sx={{ mb: { xs: 3, md: 5 } }}
          />
 

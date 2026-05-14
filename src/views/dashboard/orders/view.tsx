@@ -17,9 +17,12 @@ import MenuItem from '@mui/material/MenuItem';
 import { paths } from 'src/routes/al/paths';
 
 import { DashboardContent } from 'src/layouts/dashboard';
+import { exportToExcel, exportToCSV } from 'src/utils/export-data';
+import dayjs from 'dayjs';
 
 import { Iconify } from 'src/components/iconify';
 import { Scrollbar } from 'src/components/scrollbar';
+import { ExportButton } from 'src/components/export-button';
 import {
    useTable,
    emptyRows,
@@ -122,6 +125,79 @@ export function OrdersView() {
       all,
    ]);
 
+   const handleExport = async (format: 'excel' | 'csv') => {
+      try {
+         const params: any = {
+            page: 1,
+            limit: 10000,
+            search: debouncedSearch || '',
+            sort: table.orderBy,
+            order: table.order,
+         };
+
+         if (currentFilters.status) {
+            params.status = currentFilters.status;
+         }
+
+         const res = await all(params);
+
+         if (res.success) {
+            const orders = res.data.orders || [];
+            if (orders.length === 0) {
+               toast.error('No data to export');
+               return;
+            }
+
+            const flatData = orders.flatMap((order: any) => {
+               if (!order.order_products || order.order_products.length === 0) {
+                  return [{
+                     'Order Number': order.order_number || '-',
+                     'Date': order.created_at ? dayjs(order.created_at).format('DD MMM YYYY HH:mm') : '-',
+                     'Status': order.status || '-',
+                     'Customer Name': order.user?.name || '-',
+                     'Customer Phone': order.phone_receiver || '-',
+                     'Address': order.address_receiver || '-',
+                     'Notes': order.notes || '-',
+                     'Total Bill': order.total_bill || 0,
+                     'Product Title': '-',
+                     'Product SKU': '-',
+                     'Price At Order': 0,
+                     'Qty': 0,
+                     'Subtotal': 0
+                  }];
+               }
+
+               return order.order_products.map((item: any) => ({
+                  'Order Number': order.order_number || '-',
+                  'Date': order.created_at ? dayjs(order.created_at).format('DD MMM YYYY HH:mm') : '-',
+                  'Status': order.status || '-',
+                  'Customer Name': order.user?.name || '-',
+                  'Customer Phone': order.phone_receiver || '-',
+                  'Address': order.address_receiver || '-',
+                  'Notes': order.notes || '-',
+                  'Total Bill': order.total_bill || 0,
+                  'Product Title': item.product?.title || '-',
+                  'Product SKU': item.product?.sku || '-',
+                  'Price At Order': item.price_at_order || 0,
+                  'Qty': item.qty || 0,
+                  'Subtotal': (item.qty || 0) * (item.price_at_order || 0)
+               }));
+            });
+
+            if (format === 'excel') {
+               exportToExcel(flatData, 'Orders_Data');
+            } else {
+               exportToCSV(flatData, 'Orders_Data');
+            }
+         } else {
+            toast.error('Failed to load data for export');
+         }
+      } catch (error) {
+         toast.error('Export failed');
+         console.error(error);
+      }
+   };
+
    useEffect(() => {
       fetchData();
    }, [fetchData]);
@@ -132,7 +208,7 @@ export function OrdersView() {
       <DashboardContent maxWidth="xl">
          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
             {/* Header */}
-            <Box>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
                   <Iconify icon="solar:clipboard-list-bold" width={32} />
                   <Box>
@@ -142,6 +218,7 @@ export function OrdersView() {
                      </Box>
                   </Box>
                </Box>
+               <ExportButton onExport={handleExport} />
             </Box>
 
             {/* Filters */}

@@ -29,6 +29,8 @@ import { useRouter } from 'src/routes/hooks';
 import usePurchaseStore from 'src/stores/purchase';
 import usePrincipleStore from 'src/stores/principle';
 import { DashboardContent } from 'src/layouts/dashboard';
+import { exportToExcel, exportToCSV } from 'src/utils/export-data';
+import dayjs from 'dayjs';
 
 import { toast } from 'src/components/snackbar';
 import { Iconify } from 'src/components/iconify';
@@ -36,6 +38,7 @@ import { Scrollbar } from 'src/components/scrollbar';
 import { ConfirmDialog } from 'src/components/custom-dialog';
 import { LoadingScreen } from 'src/components/loading-screen';
 import { CustomBreadcrumbs } from 'src/components/custom-breadcrumbs';
+import { ExportButton } from 'src/components/export-button';
 import {
    useTable,
    TableNoData,
@@ -127,6 +130,84 @@ export function PurchaseListView() {
       ]
    );
 
+   const handleExport = async (format: 'excel' | 'csv') => {
+      try {
+         const params: any = {
+            page: 1,
+            limit: 10000, // fetch all
+            sort: table.orderBy || 'created_at',
+            order: table.order || 'desc',
+         };
+
+         if (search.trim()) params.search = search.trim();
+         if (selectedSuppliers.length > 0)
+            params.principle_ids = selectedSuppliers.map((s) => s.id).join(',');
+         if (startDate) params.start_date = startDate.format('YYYY-MM-DD');
+         if (endDate) params.end_date = endDate.format('YYYY-MM-DD');
+
+         const res = await all(params);
+
+         if (res.success) {
+            const purchases = res.data.purchases || [];
+            if (purchases.length === 0) {
+               toast.error('No data to export');
+               return;
+            }
+
+            const flatData = purchases.flatMap((purchase: any) => {
+               if (!purchase.purchase_products || purchase.purchase_products.length === 0) {
+                  return [{
+                     'Purchase Number': purchase.purchase_number,
+                     'Purchase Date': purchase.purchase_date ? dayjs(purchase.purchase_date).format('DD MMM YYYY') : '-',
+                     'Expected Arrival': purchase.expected_arrival_date ? dayjs(purchase.expected_arrival_date).format('DD MMM YYYY') : '-',
+                     'Status': purchase.status,
+                     'Is Clear': purchase.is_clear ? 'Yes' : 'No',
+                     'Supplier Name': purchase.principle?.title || '-',
+                     'Total Price': purchase.total_price || 0,
+                     'Notes': purchase.notes || '-',
+                     'Product Name': '-',
+                     'Product SKU': '-',
+                     'Qty Ordered': 0,
+                     'Qty Received': 0,
+                     'Qty Remaining': 0,
+                     'Purchase Price': 0,
+                     'Subtotal': 0
+                  }];
+               }
+
+               return purchase.purchase_products.map((item: any) => ({
+                  'Purchase Number': purchase.purchase_number,
+                  'Purchase Date': purchase.purchase_date ? dayjs(purchase.purchase_date).format('DD MMM YYYY') : '-',
+                  'Expected Arrival': purchase.expected_arrival_date ? dayjs(purchase.expected_arrival_date).format('DD MMM YYYY') : '-',
+                  'Status': purchase.status,
+                  'Is Clear': purchase.is_clear ? 'Yes' : 'No',
+                  'Supplier Name': purchase.principle?.title || '-',
+                  'Total Price': purchase.total_price || 0,
+                  'Notes': purchase.notes || '-',
+                  'Product Name': item.product?.title || '-',
+                  'Product SKU': item.product?.sku || '-',
+                  'Qty Ordered': item.qty || 0,
+                  'Qty Received': item.received_qty || 0,
+                  'Qty Remaining': item.remaining_qty || 0,
+                  'Purchase Price': item.purchase_price || 0,
+                  'Subtotal': item.subtotal || 0
+               }));
+            });
+
+            if (format === 'excel') {
+               exportToExcel(flatData, 'Purchases_Data');
+            } else {
+               exportToCSV(flatData, 'Purchases_Data');
+            }
+         } else {
+            toast.error('Failed to load data for export');
+         }
+      } catch (error) {
+         toast.error('Export failed');
+         console.error(error);
+      }
+   };
+
    useEffect(() => {
       fetchData();
    }, [table.page, table.rowsPerPage, table.order, table.orderBy]);
@@ -199,13 +280,16 @@ export function PurchaseListView() {
                      { name: 'List' },
                   ]}
                   action={
-                     <Button
-                        onClick={() => router.push(paths.dashboard.purchases.create)}
-                        variant="contained"
-                        startIcon={<Iconify icon="mingcute:add-line" />}
-                     >
-                        New Purchase
-                     </Button>
+                     <Stack direction="row" spacing={1}>
+                        <ExportButton onExport={handleExport} />
+                        <Button
+                           onClick={() => router.push(paths.dashboard.purchases.create)}
+                           variant="contained"
+                           startIcon={<Iconify icon="mingcute:add-line" />}
+                        >
+                           New Purchase
+                        </Button>
+                     </Stack>
                   }
                   sx={{ mb: { xs: 3, md: 5 } }}
                />

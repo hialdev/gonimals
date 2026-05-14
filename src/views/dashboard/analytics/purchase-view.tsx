@@ -23,6 +23,7 @@ import { CustomBreadcrumbs } from 'src/components/custom-breadcrumbs';
 import { LoadingScreen } from 'src/components/loading-screen';
 import { Chart, useChart } from 'src/components/chart';
 import { Label } from 'src/components/label';
+import { ExportButton } from 'src/components/export-button';
 
 import useDashboardStore from 'src/stores/dashboard';
 import { AnalyticsWidgetSummary } from './components/widget-summary';
@@ -101,6 +102,19 @@ export function PurchaseAnalyticsView() {
                { name: 'Analytics', href: paths.dashboard.analytics.purchase },
                { name: 'Purchase' },
             ]}
+            action={
+               <ExportButton
+                  filename="Purchase_Analytics_Data"
+                  data={
+                     purchaseData?.recent_purchases?.map((row: any) => ({
+                        Date: fDateTime(row.created_at),
+                        Principle: row.Principle?.name || '-',
+                        Total: row.total_price,
+                        Status: row.status,
+                     })) || []
+                  }
+               />
+            }
             sx={{ mb: { xs: 3, md: 5 } }}
          />
 

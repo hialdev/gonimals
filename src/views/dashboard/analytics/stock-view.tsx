@@ -24,6 +24,7 @@ import { CustomBreadcrumbs } from 'src/components/custom-breadcrumbs';
 import { LoadingScreen } from 'src/components/loading-screen';
 import { Chart, useChart } from 'src/components/chart';
 import { Label } from 'src/components/label';
+import { ExportButton } from 'src/components/export-button';
 
 import useDashboardStore from 'src/stores/dashboard';
 import { AnalyticsWidgetSummary } from './components/widget-summary';
@@ -76,6 +77,19 @@ export function StockAnalyticsView() {
                { name: 'Analytics', href: paths.dashboard.analytics.stock },
                { name: 'Stock' },
             ]}
+            action={
+               <ExportButton
+                  filename="Stock_Analytics_Data"
+                  data={
+                     stockData?.recent_movements?.map((row: any) => ({
+                        Date: fDateTime(row.created_at),
+                        Product: row.product?.title || '-',
+                        Reference: row.reference_type || '-',
+                        Qty: row.qty,
+                     })) || []
+                  }
+               />
+            }
             sx={{ mb: { xs: 3, md: 5 } }}
          />
 

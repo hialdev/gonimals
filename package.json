@@ -107,6 +107,7 @@
     "stylis": "^4.3.6",
     "swr": "^2.3.4",
     "turndown": "^7.2.0",
+    "xlsx": "^0.18.5",
     "yet-another-react-lightbox": "^3.25.0",
     "zod": "^4.0.15",
     "zustand": "^5.0.8"

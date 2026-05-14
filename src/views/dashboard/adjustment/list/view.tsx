@@ -17,6 +17,8 @@ import IconButton from '@mui/material/IconButton';
 import { paths } from 'src/routes/al/paths';
 import useAdjustmentStore from 'src/stores/adjustment';
 import { DashboardContent } from 'src/layouts/dashboard';
+import { exportToExcel, exportToCSV } from 'src/utils/export-data';
+import dayjs from 'dayjs';
 
 import { toast } from 'src/components/snackbar';
 import { Iconify } from 'src/components/iconify';
@@ -24,6 +26,8 @@ import { Scrollbar } from 'src/components/scrollbar';
 import { ConfirmDialog } from 'src/components/custom-dialog';
 import { LoadingScreen } from 'src/components/loading-screen';
 import { CustomBreadcrumbs } from 'src/components/custom-breadcrumbs';
+import { ExportButton } from 'src/components/export-button';
+import Stack from '@mui/material/Stack';
 import {
    useTable,
    TableNoData,
@@ -90,6 +94,48 @@ export function AdjustmentListView() {
       }
 
       setLoading(false);
+   };
+
+   const handleExport = async (format: 'excel' | 'csv') => {
+      try {
+         const params = {
+            page: 1,
+            limit: 10000,
+            sort: table.orderBy,
+            order: table.order,
+         };
+
+         const res = await all(params);
+
+         if (res.success) {
+            const adjustments = res.data.adjustments || [];
+            if (adjustments.length === 0) {
+               toast.error('No data to export');
+               return;
+            }
+
+            const flatData = adjustments.map((item: any) => ({
+               'Date': item.created_at ? dayjs(item.created_at).format('DD MMM YYYY HH:mm') : '-',
+               'Product Title': item.product?.title || '-',
+               'Product SKU': item.product?.sku || '-',
+               'Type': item.is_increment ? 'Increment (+)' : 'Decrement (-)',
+               'Quantity': item.qty || 0,
+               'Status': item.is_clear ? 'Finished' : 'Draft',
+               'Notes': item.description || '-',
+            }));
+
+            if (format === 'excel') {
+               exportToExcel(flatData, 'Adjustments_Data');
+            } else {
+               exportToCSV(flatData, 'Adjustments_Data');
+            }
+         } else {
+            toast.error('Failed to load data for export');
+         }
+      } catch (error) {
+         toast.error('Export failed');
+         console.error(error);
+      }
    };
 
    useEffect(() => {
@@ -184,13 +230,16 @@ export function AdjustmentListView() {
                   { name: 'List' },
                ]}
                action={
-                  <Button
-                     onClick={addDialog.onTrue}
-                     variant="contained"
-                     startIcon={<Iconify icon="mingcute:add-line" />}
-                  >
-                     New Adjustment
-                  </Button>
+                  <Stack direction="row" spacing={1}>
+                     <ExportButton onExport={handleExport} />
+                     <Button
+                        onClick={addDialog.onTrue}
+                        variant="contained"
+                        startIcon={<Iconify icon="mingcute:add-line" />}
+                     >
+                        New Adjustment
+                     </Button>
+                  </Stack>
                }
                sx={{ mb: { xs: 3, md: 5 } }}
             />
