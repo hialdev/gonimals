@@ -15,6 +15,9 @@ import TableContainer from '@mui/material/TableContainer';
 import TableHead from '@mui/material/TableHead';
 import TableRow from '@mui/material/TableRow';
 import Paper from '@mui/material/Paper';
+import Select from '@mui/material/Select';
+import MenuItem from '@mui/material/MenuItem';
+import FormControl from '@mui/material/FormControl';
 
 import { useTheme } from '@mui/material/styles';
 
@@ -38,14 +41,16 @@ export function SalesAnalyticsView() {
    const theme = useTheme();
    const { getSalesData, salesData } = useDashboardStore();
    const [loading, setLoading] = useState(true);
+   const [filter, setFilter] = useState<'all' | 'weekly' | 'monthly'>('all');
 
    useEffect(() => {
       const load = async () => {
-         await getSalesData();
+         setLoading(true);
+         await getSalesData(filter);
          setLoading(false);
       };
       load();
-   }, [getSalesData]);
+   }, [getSalesData, filter]);
 
    const chartSeries = salesData?.orders_by_status?.map((item: any) => Number(item.Count)) || [];
    const chartLabels = salesData?.orders_by_status?.map((item: any) => item.Status) || [];
@@ -101,18 +106,30 @@ export function SalesAnalyticsView() {
                { name: 'Sales' },
             ]}
             action={
-               <ExportButton
-                  filename="Sales_Analytics_Data"
-                  data={
-                     salesData?.recent_orders?.map((order: any) => ({
-                        'Order ID': order.code || order.id.substring(0, 8),
-                        Date: fDateTime(order.created_at),
-                        Customer: order.user?.name || '@' + order.user?.username || '-',
-                        Total: order.total_bill,
-                        Status: order.status,
-                     })) || []
-                  }
-               />
+               <Box display="flex" alignItems="center" gap={2}>
+                  <FormControl size="small" sx={{ minWidth: 120 }}>
+                     <Select
+                        value={filter}
+                        onChange={(e) => setFilter(e.target.value as any)}
+                     >
+                        <MenuItem value="all">All Time</MenuItem>
+                        <MenuItem value="weekly">This Week</MenuItem>
+                        <MenuItem value="monthly">This Month</MenuItem>
+                     </Select>
+                  </FormControl>
+                  <ExportButton
+                     filename="Sales_Analytics_Data"
+                     data={
+                        salesData?.recent_orders?.map((order: any) => ({
+                           'Order ID': order.code || order.id.substring(0, 8),
+                           Date: fDateTime(order.created_at),
+                           Customer: order.user?.name || '@' + order.user?.username || '-',
+                           Total: order.total_bill,
+                           Status: order.status,
+                        })) || []
+                     }
+                  />
+               </Box>
             }
             sx={{ mb: { xs: 3, md: 5 } }}
          />

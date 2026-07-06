@@ -14,7 +14,18 @@ export type PurchaseItemFormType = z.infer<typeof PurchaseItemSchema>;
 // Purchase Schema (for form)
 export const PurchaseSchema = z.object({
    principle_id: z.string().min(1, { message: 'Supplier is required!' }),
-   purchase_date: z.string().min(1, { message: 'Purchase Date is required!' }),
+   purchase_date: z
+      .string()
+      .min(1, { message: 'Purchase Date is required!' })
+      .refine(
+         (val) => {
+            const date = new Date(val);
+            const today = new Date();
+            today.setHours(23, 59, 59, 999);
+            return date <= today;
+         },
+         { message: 'Purchase date cannot be in the future!' }
+      ),
    expected_arrival_date: z.string().optional(),
    notes: z.string().optional(),
    items: z.array(PurchaseItemSchema).min(1, { message: 'At least one product is required!' }),

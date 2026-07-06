@@ -1,6 +1,7 @@
 import type { Purchase, PurchaseProduct } from 'src/types/purchase';
 
 import { useState, useEffect } from 'react';
+import dayjs from 'dayjs';
 import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 
@@ -184,7 +185,7 @@ export function PurchaseForm({ currentPurchase }: Props) {
                         }}
                      />
 
-                     <Field.DatePicker name="purchase_date" label="Purchase Date" />
+                     <Field.DatePicker name="purchase_date" label="Purchase Date" maxDate={dayjs()} />
                      <Field.DatePicker name="expected_arrival_date" label="Expected Arrival Date" />
 
                      <Field.Text

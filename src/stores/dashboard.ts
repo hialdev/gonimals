@@ -6,9 +6,9 @@ interface DashboardState {
    stockData: any;
    purchaseData: any;
 
-   getSalesData: () => Promise<any>;
+   getSalesData: (filter?: string) => Promise<any>;
    getStockData: () => Promise<any>;
-   getPurchaseData: () => Promise<any>;
+   getPurchaseData: (filter?: string) => Promise<any>;
 }
 
 const useDashboardStore = create<DashboardState>()((set, get) => ({
@@ -16,8 +16,8 @@ const useDashboardStore = create<DashboardState>()((set, get) => ({
    stockData: null,
    purchaseData: null,
 
-   getSalesData: async () => {
-      const response = await protectedApi.get('/dashboard/sales');
+   getSalesData: async (filter?: string) => {
+      const response = await protectedApi.get('/dashboard/sales', { params: { filter } });
       if (response.data.success && response.data.data) {
          set({ salesData: response.data.data });
       }
@@ -32,8 +32,8 @@ const useDashboardStore = create<DashboardState>()((set, get) => ({
       return response.data;
    },
 
-   getPurchaseData: async () => {
-      const response = await protectedApi.get('/dashboard/purchase');
+   getPurchaseData: async (filter?: string) => {
+      const response = await protectedApi.get('/dashboard/purchase', { params: { filter } });
       if (response.data.success && response.data.data) {
          set({ purchaseData: response.data.data });
       }

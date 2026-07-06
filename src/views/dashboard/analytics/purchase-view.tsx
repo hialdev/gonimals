@@ -11,6 +11,10 @@ import TableContainer from '@mui/material/TableContainer';
 import TableHead from '@mui/material/TableHead';
 import TableRow from '@mui/material/TableRow';
 import Paper from '@mui/material/Paper';
+import Select from '@mui/material/Select';
+import MenuItem from '@mui/material/MenuItem';
+import FormControl from '@mui/material/FormControl';
+import Box from '@mui/material/Box';
 
 import { useTheme } from '@mui/material/styles';
 
@@ -35,14 +39,16 @@ export function PurchaseAnalyticsView() {
    const theme = useTheme();
    const { getPurchaseData, purchaseData } = useDashboardStore();
    const [loading, setLoading] = useState(true);
+   const [filter, setFilter] = useState<'all' | 'weekly' | 'monthly'>('all');
 
    useEffect(() => {
       const load = async () => {
-         await getPurchaseData();
+         setLoading(true);
+         await getPurchaseData(filter);
          setLoading(false);
       };
       load();
-   }, [getPurchaseData]);
+   }, [getPurchaseData, filter]);
 
    const chartSeries =
       purchaseData?.purchases_by_status?.map((item: any) => Number(item.Count)) || [];
@@ -103,17 +109,29 @@ export function PurchaseAnalyticsView() {
                { name: 'Purchase' },
             ]}
             action={
-               <ExportButton
-                  filename="Purchase_Analytics_Data"
-                  data={
-                     purchaseData?.recent_purchases?.map((row: any) => ({
-                        Date: fDateTime(row.created_at),
-                        Principle: row.Principle?.name || '-',
-                        Total: row.total_price,
-                        Status: row.status,
-                     })) || []
-                  }
-               />
+               <Box display="flex" alignItems="center" gap={2}>
+                  <FormControl size="small" sx={{ minWidth: 120 }}>
+                     <Select
+                        value={filter}
+                        onChange={(e) => setFilter(e.target.value as any)}
+                     >
+                        <MenuItem value="all">All Time</MenuItem>
+                        <MenuItem value="weekly">This Week</MenuItem>
+                        <MenuItem value="monthly">This Month</MenuItem>
+                     </Select>
+                  </FormControl>
+                  <ExportButton
+                     filename="Purchase_Analytics_Data"
+                     data={
+                        purchaseData?.recent_purchases?.map((row: any) => ({
+                           Date: fDateTime(row.created_at),
+                           Principle: row.Principle?.name || '-',
+                           Total: row.total_price,
+                           Status: row.status,
+                        })) || []
+                     }
+                  />
+               </Box>
             }
             sx={{ mb: { xs: 3, md: 5 } }}
          />
