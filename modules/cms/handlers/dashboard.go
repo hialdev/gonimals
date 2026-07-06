@@ -3,6 +3,7 @@ package handlers
 import (
 	"aldev/modules/cms/models"
 	"aldev/utils"
+	"time"
 
 	"github.com/gofiber/fiber/v2"
 	"gorm.io/gorm"
@@ -17,39 +18,66 @@ func NewDashboardHandler(db *gorm.DB) *DashboardHandler {
 }
 
 func (h *DashboardHandler) GetSalesDashboard(c *fiber.Ctx) error {
+	filter := c.Query("filter", "all")
+
+	dbOrders := h.DB.Model(&models.Order{})
+	dbRevenue := h.DB.Model(&models.Order{}).Where("status = ?", "finish")
+	dbUpcoming := h.DB.Model(&models.Order{}).Where("status IN ?", []string{"waiting_payment", "on_progress", "stock_issue"})
+	dbStatus := h.DB.Model(&models.Order{})
+	dbRecent := h.DB.Model(&models.Order{})
+
+	if filter == "weekly" || filter == "monthly" {
+		var startDate time.Time
+		now := time.Now()
+		if filter == "weekly" {
+			days := int(now.Weekday()) - 1
+			if days < 0 {
+				days = 6
+			}
+			startDate = time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location()).AddDate(0, 0, -days)
+		} else {
+			startDate = time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, now.Location())
+		}
+
+		dbOrders = dbOrders.Where("created_at >= ?", startDate)
+		dbRevenue = dbRevenue.Where("created_at >= ?", startDate)
+		dbUpcoming = dbUpcoming.Where("created_at >= ?", startDate)
+		dbStatus = dbStatus.Where("created_at >= ?", startDate)
+		dbRecent = dbRecent.Where("created_at >= ?", startDate)
+	}
+
 	// Total orders
 	var totalOrders int64
-	h.DB.Model(&models.Order{}).Count(&totalOrders)
+	dbOrders.Count(&totalOrders)
 
 	// Total revenue (only finish)
 	var totalRevenue float64
-	h.DB.Model(&models.Order{}).Where("status = ?", "finish").
-		Select("COALESCE(SUM(total_bill), 0)").Scan(&totalRevenue)
+	dbRevenue.Select("COALESCE(SUM(total_bill), 0)").Scan(&totalRevenue)
 
 	// Upcoming revenue (waiting_payment, on_progress, stock_issue)
 	var upcomingRevenue float64
-	h.DB.Model(&models.Order{}).
-		Where("status IN ?", []string{"waiting_payment", "on_progress", "stock_issue"}).
-		Select("COALESCE(SUM(total_bill), 0)").Scan(&upcomingRevenue)
+	dbUpcoming.Select("COALESCE(SUM(total_bill), 0)").Scan(&upcomingRevenue)
 
 	// Orders by status
 	var ordersByStatus []struct {
 		Status string
 		Count  int64
 	}
-	h.DB.Model(&models.Order{}).
-		Select("status, COUNT(*) as count").
+	dbStatus.Select("status, COUNT(*) as count").
 		Group("status").
 		Scan(&ordersByStatus)
 
 	// Recent orders
 	var recentOrders []models.Order
-	h.DB.Model(&models.Order{}).
+	dbRecentQuery := dbRecent.
 		Preload("OrderProducts.Product").
 		Preload("User").
-		Order("created_at DESC").
-		Limit(10).
-		Find(&recentOrders)
+		Order("created_at DESC")
+
+	if filter == "all" {
+		dbRecentQuery = dbRecentQuery.Limit(10)
+	}
+	dbRecentQuery.Find(&recentOrders)
 
 	result := fiber.Map{
 		"total_orders":     totalOrders,
@@ -113,33 +141,60 @@ func (h *DashboardHandler) GetStockDashboard(c *fiber.Ctx) error {
 }
 
 func (h *DashboardHandler) GetPurchaseDashboard(c *fiber.Ctx) error {
+	filter := c.Query("filter", "all")
+
+	dbPurchases := h.DB.Model(&models.Purchase{})
+	dbValue := h.DB.Model(&models.Purchase{}).Where("status = ?", "completed")
+	dbStatus := h.DB.Model(&models.Purchase{})
+	dbRecent := h.DB.Model(&models.Purchase{})
+
+	if filter == "weekly" || filter == "monthly" {
+		var startDate time.Time
+		now := time.Now()
+		if filter == "weekly" {
+			days := int(now.Weekday()) - 1
+			if days < 0 {
+				days = 6
+			}
+			startDate = time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location()).AddDate(0, 0, -days)
+		} else {
+			startDate = time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, now.Location())
+		}
+
+		dbPurchases = dbPurchases.Where("created_at >= ?", startDate)
+		dbValue = dbValue.Where("created_at >= ?", startDate)
+		dbStatus = dbStatus.Where("created_at >= ?", startDate)
+		dbRecent = dbRecent.Where("created_at >= ?", startDate)
+	}
+
 	// Total purchases
 	var totalPurchases int64
-	h.DB.Model(&models.Purchase{}).Count(&totalPurchases)
+	dbPurchases.Count(&totalPurchases)
 
 	// Total purchase value
 	var totalPurchaseValue float64
-	h.DB.Model(&models.Purchase{}).Where("status = ?", "completed").
-		Select("COALESCE(SUM(total_price), 0)").Scan(&totalPurchaseValue)
+	dbValue.Select("COALESCE(SUM(total_price), 0)").Scan(&totalPurchaseValue)
 
 	// Purchases by status
 	var purchasesByStatus []struct {
 		Status string
 		Count  int64
 	}
-	h.DB.Model(&models.Purchase{}).
-		Select("status, COUNT(*) as count").
+	dbStatus.Select("status, COUNT(*) as count").
 		Group("status").
 		Scan(&purchasesByStatus)
 
 	// Recent purchases
 	var recentPurchases []models.Purchase
-	h.DB.Model(&models.Purchase{}).
+	dbRecentQuery := dbRecent.
 		Preload("Principle").
 		Preload("PurchaseProducts.Product").
-		Order("created_at DESC").
-		Limit(10).
-		Find(&recentPurchases)
+		Order("created_at DESC")
+
+	if filter == "all" {
+		dbRecentQuery = dbRecentQuery.Limit(10)
+	}
+	dbRecentQuery.Find(&recentPurchases)
 
 	result := fiber.Map{
 		"total_purchases":      totalPurchases,

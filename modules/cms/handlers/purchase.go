@@ -51,6 +51,16 @@ func computeRemainingQty(purchase *models.Purchase) {
 	}
 }
 
+func isFutureDate(t *time.Time) bool {
+	if t == nil {
+		return false
+	}
+	now := time.Now()
+	todayLocal := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
+	dateLocal := time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, now.Location())
+	return dateLocal.After(todayLocal)
+}
+
 func (h *PurchaseHandler) GetPurchase(c *fiber.Ctx) error {
 	idStr := c.Params("id")
 	id, err := uuid.Parse(idStr)
@@ -232,6 +242,10 @@ func (h *PurchaseHandler) AddPurchase(c *fiber.Ctx) error {
 		return utils.RespApi(c, "bad", "Validasi gagal", err.Error())
 	}
 
+	if isFutureDate(input.PurchaseDate) {
+		return utils.RespApi(c, "bad", "Tanggal pembelian tidak boleh melebihi hari ini", nil)
+	}
+
 	// Calculate total price
 	var totalPrice float64 = 0
 	for _, product := range input.Products {
@@ -399,6 +413,10 @@ func (h *PurchaseHandler) UpdatePurchase(c *fiber.Ctx) error {
 			return utils.RespApi(c, "bad", "Validasi gagal", verrs.Translate(utils.Translator))
 		}
 		return utils.RespApi(c, "bad", "Validasi gagal", err.Error())
+	}
+
+	if isFutureDate(input.PurchaseDate) {
+		return utils.RespApi(c, "bad", "Tanggal pembelian tidak boleh melebihi hari ini", nil)
 	}
 
 	// Calculate total price
