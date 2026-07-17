@@ -18,7 +18,8 @@ func NewDashboardHandler(db *gorm.DB) *DashboardHandler {
 }
 
 func (h *DashboardHandler) GetSalesDashboard(c *fiber.Ctx) error {
-	filter := c.Query("filter", "all")
+	startDateStr := c.Query("start_date", "")
+	endDateStr := c.Query("end_date", "")
 
 	dbOrders := h.DB.Model(&models.Order{})
 	dbRevenue := h.DB.Model(&models.Order{}).Where("status = ?", "finish")
@@ -26,24 +27,19 @@ func (h *DashboardHandler) GetSalesDashboard(c *fiber.Ctx) error {
 	dbStatus := h.DB.Model(&models.Order{})
 	dbRecent := h.DB.Model(&models.Order{})
 
-	if filter == "weekly" || filter == "monthly" {
-		var startDate time.Time
-		now := time.Now()
-		if filter == "weekly" {
-			days := int(now.Weekday()) - 1
-			if days < 0 {
-				days = 6
-			}
-			startDate = time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location()).AddDate(0, 0, -days)
-		} else {
-			startDate = time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, now.Location())
-		}
-
-		dbOrders = dbOrders.Where("created_at >= ?", startDate)
-		dbRevenue = dbRevenue.Where("created_at >= ?", startDate)
-		dbUpcoming = dbUpcoming.Where("created_at >= ?", startDate)
-		dbStatus = dbStatus.Where("created_at >= ?", startDate)
-		dbRecent = dbRecent.Where("created_at >= ?", startDate)
+	if startDateStr != "" {
+		dbOrders = dbOrders.Where("created_at >= ?", startDateStr)
+		dbRevenue = dbRevenue.Where("created_at >= ?", startDateStr)
+		dbUpcoming = dbUpcoming.Where("created_at >= ?", startDateStr)
+		dbStatus = dbStatus.Where("created_at >= ?", startDateStr)
+		dbRecent = dbRecent.Where("created_at >= ?", startDateStr)
+	}
+	if endDateStr != "" {
+		dbOrders = dbOrders.Where("created_at <= ?", endDateStr+" 23:59:59")
+		dbRevenue = dbRevenue.Where("created_at <= ?", endDateStr+" 23:59:59")
+		dbUpcoming = dbUpcoming.Where("created_at <= ?", endDateStr+" 23:59:59")
+		dbStatus = dbStatus.Where("created_at <= ?", endDateStr+" 23:59:59")
+		dbRecent = dbRecent.Where("created_at <= ?", endDateStr+" 23:59:59")
 	}
 
 	// Total orders
@@ -74,7 +70,7 @@ func (h *DashboardHandler) GetSalesDashboard(c *fiber.Ctx) error {
 		Preload("User").
 		Order("created_at DESC")
 
-	if filter == "all" {
+	if startDateStr == "" && endDateStr == "" {
 		dbRecentQuery = dbRecentQuery.Limit(10)
 	}
 	dbRecentQuery.Find(&recentOrders)
@@ -141,30 +137,25 @@ func (h *DashboardHandler) GetStockDashboard(c *fiber.Ctx) error {
 }
 
 func (h *DashboardHandler) GetPurchaseDashboard(c *fiber.Ctx) error {
-	filter := c.Query("filter", "all")
+	startDateStr := c.Query("start_date", "")
+	endDateStr := c.Query("end_date", "")
 
 	dbPurchases := h.DB.Model(&models.Purchase{})
 	dbValue := h.DB.Model(&models.Purchase{}).Where("status = ?", "completed")
 	dbStatus := h.DB.Model(&models.Purchase{})
 	dbRecent := h.DB.Model(&models.Purchase{})
 
-	if filter == "weekly" || filter == "monthly" {
-		var startDate time.Time
-		now := time.Now()
-		if filter == "weekly" {
-			days := int(now.Weekday()) - 1
-			if days < 0 {
-				days = 6
-			}
-			startDate = time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location()).AddDate(0, 0, -days)
-		} else {
-			startDate = time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, now.Location())
-		}
-
-		dbPurchases = dbPurchases.Where("created_at >= ?", startDate)
-		dbValue = dbValue.Where("created_at >= ?", startDate)
-		dbStatus = dbStatus.Where("created_at >= ?", startDate)
-		dbRecent = dbRecent.Where("created_at >= ?", startDate)
+	if startDateStr != "" {
+		dbPurchases = dbPurchases.Where("created_at >= ?", startDateStr)
+		dbValue = dbValue.Where("created_at >= ?", startDateStr)
+		dbStatus = dbStatus.Where("created_at >= ?", startDateStr)
+		dbRecent = dbRecent.Where("created_at >= ?", startDateStr)
+	}
+	if endDateStr != "" {
+		dbPurchases = dbPurchases.Where("created_at <= ?", endDateStr+" 23:59:59")
+		dbValue = dbValue.Where("created_at <= ?", endDateStr+" 23:59:59")
+		dbStatus = dbStatus.Where("created_at <= ?", endDateStr+" 23:59:59")
+		dbRecent = dbRecent.Where("created_at <= ?", endDateStr+" 23:59:59")
 	}
 
 	// Total purchases
@@ -191,7 +182,7 @@ func (h *DashboardHandler) GetPurchaseDashboard(c *fiber.Ctx) error {
 		Preload("PurchaseProducts.Product").
 		Order("created_at DESC")
 
-	if filter == "all" {
+	if startDateStr == "" && endDateStr == "" {
 		dbRecentQuery = dbRecentQuery.Limit(10)
 	}
 	dbRecentQuery.Find(&recentPurchases)
