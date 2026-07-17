@@ -15,9 +15,10 @@ import TableContainer from '@mui/material/TableContainer';
 import TableHead from '@mui/material/TableHead';
 import TableRow from '@mui/material/TableRow';
 import Paper from '@mui/material/Paper';
-import Select from '@mui/material/Select';
-import MenuItem from '@mui/material/MenuItem';
-import FormControl from '@mui/material/FormControl';
+import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
+import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
+import { DatePicker } from '@mui/x-date-pickers/DatePicker';
+import type { Dayjs } from 'dayjs';
 
 import { useTheme } from '@mui/material/styles';
 
@@ -41,16 +42,19 @@ export function SalesAnalyticsView() {
    const theme = useTheme();
    const { getSalesData, salesData } = useDashboardStore();
    const [loading, setLoading] = useState(true);
-   const [filter, setFilter] = useState<'all' | 'weekly' | 'monthly'>('all');
+   const [startDate, setStartDate] = useState<Dayjs | null>(null);
+   const [endDate, setEndDate] = useState<Dayjs | null>(null);
 
    useEffect(() => {
       const load = async () => {
          setLoading(true);
-         await getSalesData(filter);
+         const startStr = startDate && startDate.isValid() ? startDate.format('YYYY-MM-DD') : '';
+         const endStr = endDate && endDate.isValid() ? endDate.format('YYYY-MM-DD') : '';
+         await getSalesData(startStr, endStr);
          setLoading(false);
       };
       load();
-   }, [getSalesData, filter]);
+   }, [getSalesData, startDate, endDate]);
 
    const chartSeries = salesData?.orders_by_status?.map((item: any) => Number(item.Count)) || [];
    const chartLabels = salesData?.orders_by_status?.map((item: any) => item.Status) || [];
@@ -97,40 +101,44 @@ export function SalesAnalyticsView() {
    }
 
    return (
-      <DashboardContent>
-         <CustomBreadcrumbs
-            heading="Sales Analytics"
-            links={[
-               { name: 'Dashboard', href: paths.dashboard.root },
-               { name: 'Analytics', href: paths.dashboard.analytics.sales },
-               { name: 'Sales' },
-            ]}
-            action={
-               <Box display="flex" alignItems="center" gap={2}>
-                  <FormControl size="small" sx={{ minWidth: 120 }}>
-                     <Select
-                        value={filter}
-                        onChange={(e) => setFilter(e.target.value as any)}
-                     >
-                        <MenuItem value="all">All Time</MenuItem>
-                        <MenuItem value="weekly">This Week</MenuItem>
-                        <MenuItem value="monthly">This Month</MenuItem>
-                     </Select>
-                  </FormControl>
-                  <ExportButton
-                     filename="Sales_Analytics_Data"
-                     data={
-                        salesData?.recent_orders?.map((order: any) => ({
-                           'Order ID': order.code || order.id.substring(0, 8),
-                           Date: fDateTime(order.created_at),
-                           Customer: order.user?.name || '@' + order.user?.username || '-',
-                           Total: order.total_bill,
-                           Status: order.status,
-                        })) || []
-                     }
-                  />
-               </Box>
-            }
+      <LocalizationProvider dateAdapter={AdapterDayjs}>
+         <DashboardContent>
+            <CustomBreadcrumbs
+               heading="Sales Analytics"
+               links={[
+                  { name: 'Dashboard', href: paths.dashboard.root },
+                  { name: 'Analytics', href: paths.dashboard.analytics.sales },
+                  { name: 'Sales' },
+               ]}
+               action={
+                  <Box display="flex" alignItems="center" gap={2} flexWrap="wrap">
+                     <DatePicker
+                        label="Dari Tanggal"
+                        value={startDate}
+                        onChange={(val) => setStartDate(val)}
+                        slotProps={{ textField: { size: 'small', sx: { minWidth: 150 } } }}
+                     />
+                     <DatePicker
+                        label="Sampai Tanggal"
+                        value={endDate}
+                        onChange={(val) => setEndDate(val)}
+                        minDate={startDate || undefined}
+                        slotProps={{ textField: { size: 'small', sx: { minWidth: 150 } } }}
+                     />
+                     <ExportButton
+                        filename="Sales_Analytics_Data"
+                        data={
+                           salesData?.recent_orders?.map((order: any) => ({
+                              'Order ID': order.code || order.id.substring(0, 8),
+                              Date: fDateTime(order.created_at),
+                              Customer: order.user?.name || '@' + order.user?.username || '-',
+                              Total: order.total_bill,
+                              Status: order.status,
+                           })) || []
+                        }
+                     />
+                  </Box>
+               }
             sx={{ mb: { xs: 3, md: 5 } }}
          />
 
@@ -241,6 +249,7 @@ export function SalesAnalyticsView() {
                </Card>
             </Grid>
          </Grid>
-      </DashboardContent>
+         </DashboardContent>
+      </LocalizationProvider>
    );
 }

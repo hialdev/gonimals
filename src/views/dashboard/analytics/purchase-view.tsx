@@ -11,10 +11,8 @@ import TableContainer from '@mui/material/TableContainer';
 import TableHead from '@mui/material/TableHead';
 import TableRow from '@mui/material/TableRow';
 import Paper from '@mui/material/Paper';
-import Select from '@mui/material/Select';
-import MenuItem from '@mui/material/MenuItem';
-import FormControl from '@mui/material/FormControl';
 import Box from '@mui/material/Box';
+import Grid from '@mui/material/Grid';
 
 import { useTheme } from '@mui/material/styles';
 
@@ -29,9 +27,13 @@ import { Chart, useChart } from 'src/components/chart';
 import { Label } from 'src/components/label';
 import { ExportButton } from 'src/components/export-button';
 
+import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
+import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
+import { DatePicker } from '@mui/x-date-pickers/DatePicker';
+import type { Dayjs } from 'dayjs';
+
 import useDashboardStore from 'src/stores/dashboard';
 import { AnalyticsWidgetSummary } from './components/widget-summary';
-import { Grid } from '@mui/material';
 
 // ----------------------------------------------------------------------
 
@@ -39,16 +41,19 @@ export function PurchaseAnalyticsView() {
    const theme = useTheme();
    const { getPurchaseData, purchaseData } = useDashboardStore();
    const [loading, setLoading] = useState(true);
-   const [filter, setFilter] = useState<'all' | 'weekly' | 'monthly'>('all');
+   const [startDate, setStartDate] = useState<Dayjs | null>(null);
+   const [endDate, setEndDate] = useState<Dayjs | null>(null);
 
    useEffect(() => {
       const load = async () => {
          setLoading(true);
-         await getPurchaseData(filter);
+         const startStr = startDate && startDate.isValid() ? startDate.format('YYYY-MM-DD') : '';
+         const endStr = endDate && endDate.isValid() ? endDate.format('YYYY-MM-DD') : '';
+         await getPurchaseData(startStr, endStr);
          setLoading(false);
       };
       load();
-   }, [getPurchaseData, filter]);
+   }, [getPurchaseData, startDate, endDate]);
 
    const chartSeries =
       purchaseData?.purchases_by_status?.map((item: any) => Number(item.Count)) || [];
@@ -100,113 +105,118 @@ export function PurchaseAnalyticsView() {
    }
 
    return (
-      <DashboardContent>
-         <CustomBreadcrumbs
-            heading="Purchase Analytics"
-            links={[
-               { name: 'Dashboard', href: paths.dashboard.root },
-               { name: 'Analytics', href: paths.dashboard.analytics.purchase },
-               { name: 'Purchase' },
-            ]}
-            action={
-               <Box display="flex" alignItems="center" gap={2}>
-                  <FormControl size="small" sx={{ minWidth: 120 }}>
-                     <Select
-                        value={filter}
-                        onChange={(e) => setFilter(e.target.value as any)}
-                     >
-                        <MenuItem value="all">All Time</MenuItem>
-                        <MenuItem value="weekly">This Week</MenuItem>
-                        <MenuItem value="monthly">This Month</MenuItem>
-                     </Select>
-                  </FormControl>
-                  <ExportButton
-                     filename="Purchase_Analytics_Data"
-                     data={
-                        purchaseData?.recent_purchases?.map((row: any) => ({
-                           Date: fDateTime(row.created_at),
-                           Principle: row.Principle?.name || '-',
-                           Total: row.total_price,
-                           Status: row.status,
-                        })) || []
-                     }
+      <LocalizationProvider dateAdapter={AdapterDayjs}>
+         <DashboardContent>
+            <CustomBreadcrumbs
+               heading="Purchase Analytics"
+               links={[
+                  { name: 'Dashboard', href: paths.dashboard.root },
+                  { name: 'Analytics', href: paths.dashboard.analytics.purchase },
+                  { name: 'Purchase' },
+               ]}
+               action={
+                  <Box display="flex" alignItems="center" gap={2} flexWrap="wrap">
+                     <DatePicker
+                        label="Dari Tanggal"
+                        value={startDate}
+                        onChange={(val) => setStartDate(val)}
+                        slotProps={{ textField: { size: 'small', sx: { minWidth: 150 } } }}
+                     />
+                     <DatePicker
+                        label="Sampai Tanggal"
+                        value={endDate}
+                        onChange={(val) => setEndDate(val)}
+                        minDate={startDate || undefined}
+                        slotProps={{ textField: { size: 'small', sx: { minWidth: 150 } } }}
+                     />
+                     <ExportButton
+                        filename="Purchase_Analytics_Data"
+                        data={
+                           purchaseData?.recent_purchases?.map((row: any) => ({
+                              Date: fDateTime(row.created_at),
+                              Principle: row.Principle?.name || '-',
+                              Total: row.total_price,
+                              Status: row.status,
+                           })) || []
+                        }
+                     />
+                  </Box>
+               }
+               sx={{ mb: { xs: 3, md: 5 } }}
+            />
+
+            <Grid container spacing={3}>
+               <Grid size={{ xs: 12, sm: 6, md: 6 }}>
+                  <AnalyticsWidgetSummary
+                     title="Total Purchases"
+                     total={purchaseData?.total_purchases || 0}
+                     icon="solar:cart-large-2-bold-duotone"
+                     color="info"
                   />
-               </Box>
-            }
-            sx={{ mb: { xs: 3, md: 5 } }}
-         />
+               </Grid>
 
-         <Grid container spacing={3}>
-            <Grid size={{ xs: 12, sm: 6, md: 6 }}>
-               <AnalyticsWidgetSummary
-                  title="Total Purchases"
-                  total={purchaseData?.total_purchases || 0}
-                  icon="solar:cart-large-2-bold-duotone"
-                  color="info"
-               />
-            </Grid>
-
-            <Grid size={{ xs: 12, sm: 6, md: 6 }}>
-               <AnalyticsWidgetSummary
-                  title="Total Expenditures"
-                  total={purchaseData?.total_purchase_value || 0}
-                  currency
-                  icon="solar:bill-list-bold-duotone"
-                  color="warning"
-               />
-            </Grid>
-
-            <Grid size={{ xs: 12, md: 6, lg: 4 }}>
-               <Card>
-                  <CardHeader title="Purchase Status" />
-                  <Chart
-                     dir="ltr"
-                     type="pie"
-                     series={chartSeries}
-                     options={chartOptions}
-                     sx={{ width: '100%', height: 280 }}
+               <Grid size={{ xs: 12, sm: 6, md: 6 }}>
+                  <AnalyticsWidgetSummary
+                     title="Total Expenditures"
+                     total={purchaseData?.total_purchase_value || 0}
+                     currency
+                     icon="solar:bill-list-bold-duotone"
+                     color="warning"
                   />
-               </Card>
-            </Grid>
+               </Grid>
 
-            <Grid size={{ xs: 12, md: 6, lg: 8 }}>
-               <Card>
-                  <CardHeader title="Recent Purchases" />
-                  <TableContainer component={Paper} sx={{ mt: 3, maxHeight: 400 }}>
-                     <Table stickyHeader size="small">
-                        <TableHead>
-                           <TableRow>
-                              <TableCell>Date</TableCell>
-                              <TableCell>Principle</TableCell>
-                              <TableCell>Total</TableCell>
-                              <TableCell>Status</TableCell>
-                           </TableRow>
-                        </TableHead>
-                        <TableBody>
-                           {purchaseData?.recent_purchases?.map((row: any) => (
-                              <TableRow key={row.id}>
-                                 <TableCell>{fDateTime(row.created_at)}</TableCell>
-                                 <TableCell>{row.Principle?.name || '-'}</TableCell>
-                                 <TableCell>{fCurrency(row.total_price)}</TableCell>
-                                 <TableCell>
-                                    <Label
-                                       color={
-                                          (row.status === 'completed' && 'success') ||
-                                          (row.status === 'cancelled' && 'error') ||
-                                          'warning'
-                                       }
-                                    >
-                                       {row.status}
-                                    </Label>
-                                 </TableCell>
+               <Grid size={{ xs: 12, md: 6, lg: 4 }}>
+                  <Card>
+                     <CardHeader title="Purchase Status" />
+                     <Chart
+                        dir="ltr"
+                        type="pie"
+                        series={chartSeries}
+                        options={chartOptions}
+                        sx={{ width: '100%', height: 280 }}
+                     />
+                  </Card>
+               </Grid>
+
+               <Grid size={{ xs: 12, md: 6, lg: 8 }}>
+                  <Card>
+                     <CardHeader title="Recent Purchases" />
+                     <TableContainer component={Paper} sx={{ mt: 3, maxHeight: 400 }}>
+                        <Table stickyHeader size="small">
+                           <TableHead>
+                              <TableRow>
+                                 <TableCell>Date</TableCell>
+                                 <TableCell>Principle</TableCell>
+                                 <TableCell>Total</TableCell>
+                                 <TableCell>Status</TableCell>
                               </TableRow>
-                           ))}
-                        </TableBody>
-                     </Table>
-                  </TableContainer>
-               </Card>
+                           </TableHead>
+                           <TableBody>
+                              {purchaseData?.recent_purchases?.map((row: any) => (
+                                 <TableRow key={row.id}>
+                                    <TableCell>{fDateTime(row.created_at)}</TableCell>
+                                    <TableCell>{row.Principle?.name || '-'}</TableCell>
+                                    <TableCell>{fCurrency(row.total_price)}</TableCell>
+                                    <TableCell>
+                                       <Label
+                                          color={
+                                             (row.status === 'completed' && 'success') ||
+                                             (row.status === 'cancelled' && 'error') ||
+                                             'warning'
+                                          }
+                                       >
+                                          {row.status}
+                                       </Label>
+                                    </TableCell>
+                                 </TableRow>
+                              ))}
+                           </TableBody>
+                        </Table>
+                     </TableContainer>
+                  </Card>
+               </Grid>
             </Grid>
-         </Grid>
-      </DashboardContent>
+         </DashboardContent>
+      </LocalizationProvider>
    );
 }

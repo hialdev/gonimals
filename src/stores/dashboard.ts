@@ -6,9 +6,9 @@ interface DashboardState {
    stockData: any;
    purchaseData: any;
 
-   getSalesData: (filter?: string) => Promise<any>;
+   getSalesData: (startDate?: string, endDate?: string) => Promise<any>;
    getStockData: () => Promise<any>;
-   getPurchaseData: (filter?: string) => Promise<any>;
+   getPurchaseData: (startDate?: string, endDate?: string) => Promise<any>;
 }
 
 const useDashboardStore = create<DashboardState>()((set, get) => ({
@@ -16,8 +16,10 @@ const useDashboardStore = create<DashboardState>()((set, get) => ({
    stockData: null,
    purchaseData: null,
 
-   getSalesData: async (filter?: string) => {
-      const response = await protectedApi.get('/dashboard/sales', { params: { filter } });
+   getSalesData: async (startDate?: string, endDate?: string) => {
+      const response = await protectedApi.get('/dashboard/sales', {
+         params: { start_date: startDate, end_date: endDate },
+      });
       if (response.data.success && response.data.data) {
          set({ salesData: response.data.data });
       }
@@ -32,8 +34,10 @@ const useDashboardStore = create<DashboardState>()((set, get) => ({
       return response.data;
    },
 
-   getPurchaseData: async (filter?: string) => {
-      const response = await protectedApi.get('/dashboard/purchase', { params: { filter } });
+   getPurchaseData: async (startDate?: string, endDate?: string) => {
+      const response = await protectedApi.get('/dashboard/purchase', {
+         params: { start_date: startDate, end_date: endDate },
+      });
       if (response.data.success && response.data.data) {
          set({ purchaseData: response.data.data });
       }
