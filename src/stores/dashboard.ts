@@ -7,7 +7,7 @@ interface DashboardState {
    purchaseData: any;
 
    getSalesData: (startDate?: string, endDate?: string) => Promise<any>;
-   getStockData: () => Promise<any>;
+   getStockData: (startDate?: string, endDate?: string) => Promise<any>;
    getPurchaseData: (startDate?: string, endDate?: string) => Promise<any>;
 }
 
@@ -26,8 +26,10 @@ const useDashboardStore = create<DashboardState>()((set, get) => ({
       return response.data;
    },
 
-   getStockData: async () => {
-      const response = await protectedApi.get('/dashboard/stock');
+   getStockData: async (startDate?: string, endDate?: string) => {
+      const response = await protectedApi.get('/dashboard/stock', {
+         params: { start_date: startDate, end_date: endDate },
+      });
       if (response.data.success && response.data.data) {
          set({ stockData: response.data.data });
       }
