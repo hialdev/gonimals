@@ -3,6 +3,7 @@ package handlers
 import (
 	"aldev/modules/cms/models"
 	"aldev/utils"
+	"log"
 
 	"github.com/gofiber/fiber/v2"
 	"gorm.io/gorm"
@@ -19,6 +20,8 @@ func NewDashboardHandler(db *gorm.DB) *DashboardHandler {
 func (h *DashboardHandler) GetSalesDashboard(c *fiber.Ctx) error {
 	startDateStr := c.Query("start_date", "")
 	endDateStr := c.Query("end_date", "")
+
+	log.Printf("GetSalesDashboard called: start_date='%s', end_date='%s'", startDateStr, endDateStr)
 
 	dbOrders := h.DB.Model(&models.Order{})
 	dbRevenue := h.DB.Model(&models.Order{}).Where("status = ?", "finish")
@@ -74,6 +77,8 @@ func (h *DashboardHandler) GetSalesDashboard(c *fiber.Ctx) error {
 	}
 	dbRecentQuery.Find(&recentOrders)
 
+	log.Printf("GetSalesDashboard: found %d recent orders", len(recentOrders))
+
 	result := fiber.Map{
 		"total_orders":     totalOrders,
 		"total_revenue":    totalRevenue,
@@ -86,6 +91,11 @@ func (h *DashboardHandler) GetSalesDashboard(c *fiber.Ctx) error {
 }
 
 func (h *DashboardHandler) GetStockDashboard(c *fiber.Ctx) error {
+	startDateStr := c.Query("start_date", "")
+	endDateStr := c.Query("end_date", "")
+
+	log.Printf("GetStockDashboard called: start_date='%s', end_date='%s'", startDateStr, endDateStr)
+
 	// Total products
 	var totalProducts int64
 	h.DB.Model(&models.Product{}).Count(&totalProducts)
@@ -117,12 +127,26 @@ func (h *DashboardHandler) GetStockDashboard(c *fiber.Ctx) error {
 		Scan(&productsByType)
 
 	// Recent stock movements
+	dbRecent := h.DB.Model(&models.StockMovement{})
+
+	if startDateStr != "" {
+		dbRecent = dbRecent.Where("created_at >= ?", startDateStr)
+	}
+	if endDateStr != "" {
+		dbRecent = dbRecent.Where("created_at <= ?", endDateStr+" 23:59:59")
+	}
+
 	var recentMovements []models.StockMovement
-	h.DB.Model(&models.StockMovement{}).
+	dbRecentQuery := dbRecent.
 		Preload("Product").
-		Order("created_at DESC").
-		Limit(20).
-		Find(&recentMovements)
+		Order("created_at DESC")
+
+	if startDateStr == "" && endDateStr == "" {
+		dbRecentQuery = dbRecentQuery.Limit(20)
+	}
+	dbRecentQuery.Find(&recentMovements)
+
+	log.Printf("GetStockDashboard: found %d stock movements", len(recentMovements))
 
 	result := fiber.Map{
 		"total_products":     totalProducts,
@@ -138,6 +162,8 @@ func (h *DashboardHandler) GetStockDashboard(c *fiber.Ctx) error {
 func (h *DashboardHandler) GetPurchaseDashboard(c *fiber.Ctx) error {
 	startDateStr := c.Query("start_date", "")
 	endDateStr := c.Query("end_date", "")
+
+	log.Printf("GetPurchaseDashboard called: start_date='%s', end_date='%s'", startDateStr, endDateStr)
 
 	dbPurchases := h.DB.Model(&models.Purchase{})
 	dbValue := h.DB.Model(&models.Purchase{}).Where("status = ?", "completed")
@@ -185,6 +211,8 @@ func (h *DashboardHandler) GetPurchaseDashboard(c *fiber.Ctx) error {
 		dbRecentQuery = dbRecentQuery.Limit(10)
 	}
 	dbRecentQuery.Find(&recentPurchases)
+
+	log.Printf("GetPurchaseDashboard: found %d recent purchases", len(recentPurchases))
 
 	result := fiber.Map{
 		"total_purchases":      totalPurchases,
