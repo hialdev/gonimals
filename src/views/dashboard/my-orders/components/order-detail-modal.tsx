@@ -29,6 +29,7 @@ import { Iconify } from 'src/components/iconify';
 import { fCurrency } from 'src/utils/format-number';
 import { CONFIG } from 'src/global-config';
 import { ReviewModal } from './review-modal';
+import { ConfirmReceiptModal } from './confirm-receipt-modal';
 // import useOrderLogStatusStore from 'src/stores/order-log-status';
 
 // ----------------------------------------------------------------------
@@ -45,6 +46,7 @@ export function OrderDetailModal({ open, onClose, order }: Props) {
 
    const reviewModal = useBoolean();
    const [selectedProduct, setSelectedProduct] = useState<any>(null);
+   const confirmReceiptModal = useBoolean();
 
    // Removed fetchLogs and store usage since data is passed via props
 
@@ -52,6 +54,7 @@ export function OrderDetailModal({ open, onClose, order }: Props) {
       waiting_payment: 'warning',
       waiting_confirmation: 'info',
       on_progress: 'info',
+      delivered: 'info',
       finish: 'success',
       stock_issue: 'error',
       waiting_restock: 'info',
@@ -64,6 +67,7 @@ export function OrderDetailModal({ open, onClose, order }: Props) {
       waiting_payment: 'Waiting Payment',
       waiting_confirmation: 'Waiting Confirmation',
       on_progress: 'On Progress',
+      delivered: 'Delivered / Dikirim',
       finish: 'Finished',
       stock_issue: 'Stock Issue',
       waiting_restock: 'Waiting Restock',
@@ -418,6 +422,16 @@ export function OrderDetailModal({ open, onClose, order }: Props) {
             <Button onClick={onClose} variant="outlined" color="inherit">
                Close
             </Button>
+            {order.status === 'delivered' && (
+               <Button
+                  variant="contained"
+                  color="success"
+                  onClick={confirmReceiptModal.onTrue}
+                  startIcon={<Iconify icon="solar:check-circle-bold" />}
+               >
+                  Konfirmasi Pesanan Diterima
+               </Button>
+            )}
          </DialogActions>
 
          {selectedProduct && (
@@ -429,6 +443,18 @@ export function OrderDetailModal({ open, onClose, order }: Props) {
                }}
                orderId={order.id!}
                orderProduct={selectedProduct}
+            />
+         )}
+
+         {order.status === 'delivered' && (
+            <ConfirmReceiptModal
+               open={confirmReceiptModal.value}
+               onClose={confirmReceiptModal.onFalse}
+               order={order}
+               onSuccess={() => {
+                  confirmReceiptModal.onFalse();
+                  onClose();
+               }}
             />
          )}
       </Dialog>

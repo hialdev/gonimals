@@ -48,6 +48,7 @@ const STATUS_OPTIONS = [
    { value: 'waiting_payment', label: 'Waiting Payment' },
    { value: 'waiting_confirmation', label: 'Waiting Confirmation' },
    { value: 'on_progress', label: 'On Progress' },
+   { value: 'delivered', label: 'Delivered / Dikirim' },
    { value: 'finish', label: 'Finish' },
 
    { value: 'stock_issue', label: 'Stock Issue' },

@@ -11,12 +11,15 @@ import TableCell from '@mui/material/TableCell';
 import IconButton from '@mui/material/IconButton';
 import Typography from '@mui/material/Typography';
 
+import Button from '@mui/material/Button';
+
 import { Iconify } from 'src/components/iconify';
 import { fCurrency } from 'src/utils/format-number';
 import useOrderStore from 'src/stores/order';
 
 import { OrderDetailModal } from './order-detail-modal';
 import { StockIssueModal } from './stock-issue-modal';
+import { ConfirmReceiptModal } from './confirm-receipt-modal';
 import { OrderReviewsModal } from '../../orders/components/order-reviews-modal';
 
 // ----------------------------------------------------------------------
@@ -29,6 +32,7 @@ type Props = {
 export function OrderTableRow({ row, onActionSuccess }: Props) {
    const [openDetailModal, setOpenDetailModal] = useState(false);
    const [openStockIssueModal, setOpenStockIssueModal] = useState(false);
+   const [openConfirmModal, setOpenConfirmModal] = useState(false);
    const [openReviewsModal, setOpenReviewsModal] = useState(false);
 
    const { requestRefund, waitRestock } = useOrderStore();
@@ -37,6 +41,7 @@ export function OrderTableRow({ row, onActionSuccess }: Props) {
       waiting_payment: 'warning',
       waiting_confirmation: 'info',
       on_progress: 'info',
+      delivered: 'info',
       finish: 'success',
       stock_issue: 'error',
       waiting_restock: 'info',
@@ -49,7 +54,8 @@ export function OrderTableRow({ row, onActionSuccess }: Props) {
       waiting_payment: 'Waiting Payment',
       waiting_confirmation: 'Waiting Confirmation',
       on_progress: 'On Progress',
-      finish: 'Finish',
+      delivered: 'Delivered / Dikirim',
+      finish: 'Finished',
       stock_issue: 'Stock Issue',
       waiting_restock: 'Waiting Restock',
       refund_pending: 'Refund Pending',
@@ -141,6 +147,18 @@ export function OrderTableRow({ row, onActionSuccess }: Props) {
             </TableCell>
 
             <TableCell align="right">
+               {row.status === 'delivered' && (
+                  <Button
+                     size="small"
+                     variant="contained"
+                     color="success"
+                     onClick={() => setOpenConfirmModal(true)}
+                     startIcon={<Iconify icon="solar:check-circle-bold" />}
+                     sx={{ mr: 1 }}
+                  >
+                     Pesanan Diterima
+                  </Button>
+               )}
                {row.status === 'finish' && (
                   <IconButton onClick={() => setOpenReviewsModal(true)}>
                      <Iconify icon="solar:star-bold" sx={{ color: 'warning.main' }} />
@@ -153,6 +171,17 @@ export function OrderTableRow({ row, onActionSuccess }: Props) {
          </TableRow>
 
          <OrderDetailModal open={openDetailModal} onClose={handleCloseDetailModal} order={row} />
+
+         {row.status === 'delivered' && (
+            <ConfirmReceiptModal
+               open={openConfirmModal}
+               onClose={() => setOpenConfirmModal(false)}
+               order={row}
+               onSuccess={() => {
+                  if (onActionSuccess) onActionSuccess();
+               }}
+            />
+         )}
 
          {row.status === 'stock_issue' && (
             <StockIssueModal

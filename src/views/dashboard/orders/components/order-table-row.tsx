@@ -22,6 +22,7 @@ import { OrderDetailModal } from './order-detail-modal';
 import { RefundModal } from './refund-modal';
 import { CancelModal } from './cancel-modal';
 import { ConfirmRestockModal } from './confirm-restock-modal';
+import { DeliverModal } from './deliver-modal';
 import { FinishModal } from './finish-modal';
 import { ConfirmPaymentModal } from './confirm-payment-modal';
 import { OrderReviewsModal } from './order-reviews-modal';
@@ -42,6 +43,7 @@ export function OrderTableRow({ row, onActionSuccess }: Props) {
    const [openRefundModal, setOpenRefundModal] = useState(false);
    const [openCancelModal, setOpenCancelModal] = useState(false);
    const [openRestockModal, setOpenRestockModal] = useState(false);
+   const [openDeliverModal, setOpenDeliverModal] = useState(false);
    const [openFinishModal, setOpenFinishModal] = useState(false);
    const [openConfirmPaymentModal, setOpenConfirmPaymentModal] = useState(false);
    const [openReviewsModal, setOpenReviewsModal] = useState(false);
@@ -50,6 +52,7 @@ export function OrderTableRow({ row, onActionSuccess }: Props) {
       waiting_payment: 'warning',
       waiting_confirmation: 'info',
       on_progress: 'info',
+      delivered: 'info',
       finish: 'success',
       stock_issue: 'error',
       waiting_restock: 'info',
@@ -62,6 +65,7 @@ export function OrderTableRow({ row, onActionSuccess }: Props) {
       waiting_payment: 'Waiting Payment',
       waiting_confirmation: 'Menunggu Konfirmasi',
       on_progress: 'On Progress',
+      delivered: 'Delivered / Dikirim',
       finish: 'Finished',
       stock_issue: 'Stock Issue',
       waiting_restock: 'Waiting Restock',
@@ -79,7 +83,8 @@ export function OrderTableRow({ row, onActionSuccess }: Props) {
    const canCancel =
       row.status !== 'finish' && row.status !== 'refunded' && row.status !== 'canceled';
    const canConfirmRestock = row.status === 'waiting_restock';
-   const canFinish = row.status === 'on_progress';
+   const canDeliver = row.status === 'on_progress';
+   const canFinish = row.status === 'delivered' || row.status === 'on_progress';
    const canConfirmPayment = row.status === 'waiting_confirmation';
    const canViewReviews = row.status === 'finish';
 
@@ -157,6 +162,19 @@ export function OrderTableRow({ row, onActionSuccess }: Props) {
                   </MenuItem>
                )}
 
+               {canDeliver && (
+                  <MenuItem
+                     onClick={() => {
+                        setOpenDeliverModal(true);
+                        popover.onClose();
+                     }}
+                     sx={{ color: 'info.main' }}
+                  >
+                     <Iconify icon="solar:delivery-bold" />
+                     Kirim Pesanan (Mark as Delivered)
+                  </MenuItem>
+               )}
+
                {canFinish && (
                   <MenuItem
                      onClick={() => {
@@ -165,7 +183,7 @@ export function OrderTableRow({ row, onActionSuccess }: Props) {
                      }}
                   >
                      <Iconify icon="solar:check-circle-bold" />
-                     Mark as Finished
+                     {row.status === 'delivered' ? 'Selesaikan Pesanan (Force Finish)' : 'Mark as Finished'}
                   </MenuItem>
                )}
 
@@ -224,6 +242,15 @@ export function OrderTableRow({ row, onActionSuccess }: Props) {
             <ConfirmRestockModal
                open={openRestockModal}
                onClose={() => setOpenRestockModal(false)}
+               order={row}
+               onSuccess={handleActionSuccess}
+            />
+         )}
+
+         {canDeliver && (
+            <DeliverModal
+               open={openDeliverModal}
+               onClose={() => setOpenDeliverModal(false)}
                order={row}
                onSuccess={handleActionSuccess}
             />

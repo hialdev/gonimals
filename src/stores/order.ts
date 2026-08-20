@@ -29,11 +29,13 @@ interface OrderState {
    getMyOrder: ({ id }: { id: string }) => Promise<any>;
    requestRefund: ({ id }: { id: string }) => Promise<any>;
    waitRestock: ({ id }: { id: string }) => Promise<any>;
+   confirmReceipt: ({ id }: { id: string }) => Promise<any>;
 
    // Admin actions
    adminRefund: ({ id, data }: { id: string; data: FormData }) => Promise<any>;
    adminCancel: ({ id, data }: { id: string; data: FormData }) => Promise<any>;
    adminConfirmRestock: ({ id, data }: { id: string; data: FormData }) => Promise<any>;
+   adminDeliver: ({ id, data }: { id: string; data: FormData }) => Promise<any>;
    adminFinish: ({ id, data }: { id: string; data: FormData }) => Promise<any>;
    confirmPayment: ({ id }: { id: string }) => Promise<any>;
    rejectPayment: ({ id, reason }: { id: string; reason?: string }) => Promise<any>;
@@ -118,6 +120,10 @@ const useOrderStore = create<OrderState>()(
             const response = await protectedApi.post(`/orders/${id}/wait-restock`);
             return response.data;
          },
+         confirmReceipt: async ({ id }) => {
+            const response = await protectedApi.post(`/user/my-orders/${id}/confirm-receipt`);
+            return response.data;
+         },
 
          // Admin actions
          adminRefund: async ({ id, data }) => {
@@ -134,6 +140,12 @@ const useOrderStore = create<OrderState>()(
          },
          adminConfirmRestock: async ({ id, data }) => {
             const response = await protectedApi.post(`/orders/${id}/admin-confirm-restock`, data, {
+               headers: { 'Content-Type': 'multipart/form-data' },
+            });
+            return response.data;
+         },
+         adminDeliver: async ({ id, data }) => {
+            const response = await protectedApi.post(`/orders/${id}/admin-deliver`, data, {
                headers: { 'Content-Type': 'multipart/form-data' },
             });
             return response.data;

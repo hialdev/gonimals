@@ -44,6 +44,7 @@ export interface Order {
       | 'waiting_payment'
       | 'waiting_confirmation'
       | 'on_progress'
+      | 'delivered'
       | 'finish'
       | 'stock_issue'
       | 'waiting_restock'
