@@ -830,8 +830,8 @@ func (h *OrderHandler) AdminConfirmRestock(c *fiber.Ctx) error {
 	return utils.RespApi(c, "ok", "Restock confirmed, order is now in progress", nil)
 }
 
-// AdminFinish - Admin marks order as finished
-func (h *OrderHandler) AdminFinish(c *fiber.Ctx) error {
+// AdminDeliver - Admin marks order as delivered (shipped to customer)
+func (h *OrderHandler) AdminDeliver(c *fiber.Ctx) error {
 	orderID := c.Params("id")
 
 	// Parse UUID
@@ -849,6 +849,67 @@ func (h *OrderHandler) AdminFinish(c *fiber.Ctx) error {
 	// Check if order is in on_progress status
 	if order.Status == nil || *order.Status != "on_progress" {
 		return utils.RespApi(c, "bad", "Order is not in on_progress status", nil)
+	}
+
+	// Get reason from form (with default)
+	reason := c.FormValue("reason")
+	if reason == "" {
+		reason = GetDefaultReason("delivered")
+	}
+
+	// Handle multiple image uploads (e.g. proof of shipping / receipt)
+	var images []string
+	form, err := c.MultipartForm()
+	if err == nil {
+		imageFiles := form.File["images"]
+		if len(imageFiles) > 0 {
+			if filePaths, err := utils.UploadFileFlex(c, "images", "order_proofs"); err == nil && len(filePaths) > 0 {
+				images = filePaths
+			}
+		}
+	}
+
+	// Get admin user ID from context
+	var adminID *uuid.UUID
+	if userID := c.Locals("user_id"); userID != nil {
+		if uid, ok := userID.(uuid.UUID); ok {
+			adminID = &uid
+		}
+	}
+
+	// Update order status to delivered
+	newStatus := "delivered"
+	if err := h.DB.Model(&order).Update("status", newStatus).Error; err != nil {
+		return utils.RespApi(c, "ise", "Failed to update order status", err.Error())
+	}
+
+	// Create order log
+	if err := CreateOrderLog(h.DB, id, newStatus, reason, images, adminID); err != nil {
+		fmt.Printf("Failed to create order log: %v\n", err)
+	}
+
+	return utils.RespApi(c, "ok", "Order marked as delivered", nil)
+}
+
+// AdminFinish - Admin marks order as finished (force finish / overrule)
+func (h *OrderHandler) AdminFinish(c *fiber.Ctx) error {
+	orderID := c.Params("id")
+
+	// Parse UUID
+	id, err := uuid.Parse(orderID)
+	if err != nil {
+		return utils.RespApi(c, "bad", "Invalid order ID", err.Error())
+	}
+
+	// Get order
+	var order models.Order
+	if err := h.DB.First(&order, "id = ?", id).Error; err != nil {
+		return utils.RespApi(c, "nf", "Order not found", err.Error())
+	}
+
+	// Check if order is in on_progress or delivered status
+	if order.Status == nil || (*order.Status != "on_progress" && *order.Status != "delivered") {
+		return utils.RespApi(c, "bad", "Order status must be on_progress or delivered", nil)
 	}
 
 	// Get reason from form (with default)

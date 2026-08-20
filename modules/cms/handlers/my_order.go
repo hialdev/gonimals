@@ -338,6 +338,50 @@ func (h *MyOrderHandler) GetMyOrderDetail(c *fiber.Ctx) error {
 	return utils.RespApi(c, "ok", "Berhasil mendapatkan detail pesanan", order)
 }
 
+// ConfirmReceipt - Customer confirms that they have received the order
+func (h *MyOrderHandler) ConfirmReceipt(c *fiber.Ctx) error {
+	userIDStr, err := h.GetUserIDFromToken(c)
+	if err != nil {
+		return utils.RespApi(c, "unauth", "User ID not found in token", nil)
+	}
+
+	userID, err := uuid.Parse(userIDStr)
+	if err != nil {
+		return utils.RespApi(c, "bad", "User ID tidak valid", err.Error())
+	}
+
+	orderIDStr := c.Params("id")
+	orderID, err := uuid.Parse(orderIDStr)
+	if err != nil {
+		return utils.RespApi(c, "bad", "Invalid order ID", err.Error())
+	}
+
+	var order models.Order
+	if err := h.DB.Where("id = ? AND user_id = ?", orderID, userID).First(&order).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			return utils.RespApi(c, "nf", "Pesanan tidak ditemukan atau bukan milik Anda", nil)
+		}
+		return utils.RespApi(c, "ise", "Gagal mengambil data pesanan", err.Error())
+	}
+
+	// Verify order status is delivered
+	if order.Status == nil || *order.Status != "delivered" {
+		return utils.RespApi(c, "bad", "Pesanan belum dikirim atau sudah selesai dikonfirmasi", nil)
+	}
+
+	newStatus := "finish"
+	if err := h.DB.Model(&order).Update("status", newStatus).Error; err != nil {
+		return utils.RespApi(c, "ise", "Gagal memperbarui status pesanan", err.Error())
+	}
+
+	reason := "Pesanan telah diterima oleh customer"
+	if err := CreateOrderLog(h.DB, orderID, newStatus, reason, nil, &userID); err != nil {
+		fmt.Printf("Failed to create order log: %v\n", err)
+	}
+
+	return utils.RespApi(c, "ok", "Pesanan berhasil dikonfirmasi diterima", nil)
+}
+
 // Helper duplicated from OrderHandler to avoid cross-struct dependency without refactoring everything
 func createXenditInvoiceLocal(order models.Order, orderItems []struct {
 	ProductID    *uuid.UUID

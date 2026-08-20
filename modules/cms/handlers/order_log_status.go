@@ -73,6 +73,7 @@ func GetDefaultReason(status string) string {
 		"waiting_restock": "Menunggu restock dari admin",
 		"refunded":        "Admin berhasil refund",
 		"on_progress":     "Pesanan sedang disiapkan dan diproses",
+		"delivered":       "Pesanan telah dikirim oleh admin, menunggu konfirmasi penerimaan dari customer",
 		"canceled":        "Pesanan dibatalkan",
 		"finish":          "Pesanan telah selesai, terimakasih telah mempercayai kami",
 	}

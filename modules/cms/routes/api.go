@@ -111,6 +111,7 @@ func SetupCMSRoutes(app *fiber.App, db *gorm.DB) {
 	userRoutes.Get("/my-orders/:id", myOrder.GetMyOrderDetail)
 	userRoutes.Post("/checkout", myOrder.CreateMyOrder)
 	userRoutes.Post("/my-orders/:id/upload-transfer", orders.UploadTransferProof)
+	userRoutes.Post("/my-orders/:id/confirm-receipt", myOrder.ConfirmReceipt)
 	userRoutes.Post("/reviews", reviews.AddProductReview)
 
 	od := api.Group("/orders")
@@ -128,6 +129,7 @@ func SetupCMSRoutes(app *fiber.App, db *gorm.DB) {
 	od.Use(middlewares.DoACL("Refund Order")).Post("/:id/admin-refund", orders.AdminRefund)
 	od.Use(middlewares.DoACL("Cancel Order")).Post("/:id/admin-cancel", orders.AdminCancel)
 	od.Use(middlewares.DoACL("Update Order")).Post("/:id/admin-confirm-restock", orders.AdminConfirmRestock)
+	od.Use(middlewares.DoACL("Update Order")).Post("/:id/admin-deliver", orders.AdminDeliver)
 	od.Use(middlewares.DoACL("Update Order")).Post("/:id/admin-finish", orders.AdminFinish)
 	od.Use(middlewares.DoACL("Update Order")).Post("/:id/confirm-payment", orders.ConfirmPayment)
 	od.Use(middlewares.DoACL("Update Order")).Post("/:id/reject-payment", orders.RejectPayment)
